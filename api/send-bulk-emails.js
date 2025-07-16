@@ -10,10 +10,6 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
   try {
     const { contacts, template, fromAccount, campaignId, batchSize = 5 } = req.body;
 
@@ -24,10 +20,12 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // SMTP configuration
+    console.log('=== MAILTRAP BULK EMAIL SENDING ===');
+    console.log('Total contacts:', contacts.length);
+
     const smtpConfig = {
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT),
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
@@ -35,7 +33,6 @@ module.exports = async function handler(req, res) {
       }
     };
 
-    // CORRECT FUNCTION NAME - createTransport
     const transporter = nodemailer.createTransport(smtpConfig);
 
     const results = {
@@ -65,7 +62,7 @@ module.exports = async function handler(req, res) {
         });
 
         const mailOptions = {
-          from: process.env.SMTP_USER,
+          from: 'test@example.com',
           to: contact.email,
           subject: personalizedSubject,
           html: personalizedContent
@@ -73,10 +70,11 @@ module.exports = async function handler(req, res) {
 
         await transporter.sendMail(mailOptions);
         results.sent++;
+        console.log(`✅ Email sent to ${contact.email}`);
         
-        // Delay between emails
+        // Small delay between emails
         if (i < contacts.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
 
       } catch (error) {
@@ -85,6 +83,7 @@ module.exports = async function handler(req, res) {
           email: contact.email || 'unknown',
           error: error.message
         });
+        console.log(`❌ Failed to send to ${contact.email}: ${error.message}`);
       }
     }
 
