@@ -1,0 +1,24 @@
+{
+  "name": "email-marketing-tool",
+  "version": "1.0.0",
+  "description": "Advanced email marketing tool with Vercel + Nodemailer",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "next build",
+    "start": "next start",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.7",
+    "express-rate-limit": "^7.1.5",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0"
+  },
+  "devDependencies": {
+    "vercel": "^32.7.2"
+  },
+  "keywords": ["email", "marketing", "nodemailer", "vercel"],
+  "author": "Your Name",
+  "license": "MIT"
+}

@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "functions": {
+    "api/send-email.js": {
+      "maxDuration": 30
+    },
+    "api/send-bulk-emails.js": {
+      "maxDuration": 300
+    },
+    "api/test-connection.js": {
+      "maxDuration": 15
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

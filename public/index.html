@@ -1,0 +1,1727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Marketing Tool - Vercel + Nodemailer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.15);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            gap: 15px;
+        }
+
+        .section-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .upload-zone {
+            border: 3px dashed #3498db;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            background: linear-gradient(135deg, #f8f9ff, #e3f2fd);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone:hover {
+            border-color: #2980b9;
+            background: linear-gradient(135deg, #e3f2fd, #d1e7dd);
+            transform: scale(1.02);
+        }
+
+        .upload-zone.dragover {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #d1e7dd, #c3e6cb);
+            transform: scale(1.05);
+        }
+
+        .upload-icon {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            color: #3498db;
+        }
+
+        .upload-text {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .upload-subtitle {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .form-control-textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+        }
+
+        .merge-fields {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .merge-field {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-weight: 500;
+        }
+
+        .merge-field:hover {
+            background: linear-gradient(135deg, #2980b9, #1f4e79);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .contacts-preview {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+        }
+
+        .contacts-preview h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .contact-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.3s ease;
+        }
+
+        .contact-item:hover {
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .contact-item:last-child {
+            border-bottom: none;
+        }
+
+        .contact-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .contact-email {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .email-accounts {
+            display: grid;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .email-account {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .email-account.connected {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #d1e7dd, #c3e6cb);
+        }
+
+        .email-account.disconnected {
+            border-color: #e74c3c;
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        }
+
+        .account-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .account-email {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .account-provider {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .account-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .progress-container {
+            padding: 30px;
+            background: white;
+            margin: 20px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .log-area {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            padding: 4px 0;
+            border-radius: 4px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .log-success { color: #2ecc71; }
+        .log-error { color: #e74c3c; }
+        .log-warning { color: #f39c12; }
+        .log-info { color: #3498db; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 25px 30px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #7f8c8d;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: #f8f9fa;
+            color: #2c3e50;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .provider-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .provider-card {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .provider-card:hover {
+            border-color: #3498db;
+            background: #f8f9ff;
+            transform: translateY(-2px);
+        }
+
+        .provider-card.selected {
+            border-color: #3498db;
+            background: #e3f2fd;
+        }
+
+        .provider-icon {
+            font-size: 2.5em;
+            margin-bottom: 15px;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .provider-description {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 25px;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd, #f8f9ff);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #bee5eb;
+            margin-top: 20px;
+        }
+
+        .info-box h4 {
+            color: #0c5460;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .info-box p {
+            color: #0c5460;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+        }
+
+        .feature-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .feature-card p {
+            color: #6c757d;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Email Marketing Pro</h1>
+            <p>Real email sending with Vercel + Nodemailer</p>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-number" id="totalSent">0</span>
+                    <span class="stat-label">Emails Sent</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="successRate">0%</span>
+                    <span class="stat-label">Success Rate</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="inQueue">0</span>
+                    <span class="stat-label">In Queue</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="failedCount">0</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Column -->
+            <div class="left-column">
+                <!-- Upload Contacts -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-icon">1</div>
+                        <div class="section-title">Upload Contacts</div>
+                    </div>
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📋</div>
+                        <div class="upload-text">Drop your CSV file here</div>
+                        <div class="upload-subtitle">or click to browse</div>
+                        <input type="file" id="csvInput" accept=".csv" style="display: none;">
+                        <button class="btn btn-small" onclick="document.getElementById('csvInput').click()">
+                            📁 Choose File
+                        </button>
+                    </div>
+                    <div class="contacts-preview" id="contactsPreview" style="display: none;">
+                        <h3>📊 Contacts Preview</h3>
+                        <div id="contactsList"></div>
+                    </div>
+                </div>
+
+                <!-- Email Template -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-icon">2</div>
+                        <div class="section-title">Email Template</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" class="form-control" id="templateName" placeholder="My Marketing Campaign">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subject Line</label>
+                        <input type="text" class="form-control" id="subjectLine" placeholder="Hello {{firstName}}, exclusive offer for {{company}}!">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Merge Fields</label>
+                        <div class="merge-fields" id="mergeFields"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email Content</label>
+                        <textarea class="form-control form-control-textarea" id="emailContent" placeholder="Dear {{firstName}},&#10;&#10;Hope you're doing well! I wanted to reach out about...&#10;&#10;Best regards,&#10;Your Name"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="right-column">
+                <!-- Campaign Settings -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-icon">3</div>
+                        <div class="section-title">Campaign Settings</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Campaign Name</label>
+                        <input type="text" class="form-control" id="campaignName" placeholder="Q1 2024 Newsletter">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Send Rate</label>
+                        <select class="form-control" id="sendRate">
+                            <option value="30">30 emails/hour per account</option>
+                            <option value="50">50 emails/hour per account</option>
+                            <option value="100">100 emails/hour per account</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Schedule</label>
+                        <select class="form-control" id="schedule">
+                            <option value="immediate">Send Now</option>
+                            <option value="scheduled">Schedule for Later</option>
+                            <option value="drip">Drip Campaign</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" id="startCampaign">
+                        🚀 Launch Campaign
+                    </button>
+                </div>
+
+                <!-- Email Accounts -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-icon">4</div>
+                        <div class="section-title">Email Accounts</div>
+                    </div>
+                    <div class="email-accounts" id="emailAccounts"></div>
+                    <button class="btn" id="addAccountBtn">
+                        ➕ Add Email Account
+                    </button>
+                    
+                    <div class="info-box">
+                        <h4>📧 Email Service Integration</h4>
+                        <p><strong>Gmail/Google Workspace:</strong> Enable 2FA and generate app password</p>
+                        <p><strong>Outlook/Microsoft 365:</strong> Use OAuth2 authentication</p>
+                        <p><strong>Custom SMTP:</strong> Contact your provider for settings</p>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-icon">⚡</div>
+                        <div class="section-title">Quick Actions</div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-small" id="previewBtn">👁️ Preview</button>
+                        <button class="btn btn-small" id="testBtn">🧪 Test Send</button>
+                        <button class="btn btn-small" id="saveBtn">💾 Save Template</button>
+                        <button class="btn btn-small btn-secondary" id="downloadSample">📥 Sample CSV</button>
+                    </div>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>✅ Real Email Sending</h4>
+                            <p>Powered by Nodemailer with actual SMTP delivery</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🚀 Vercel Deployment</h4>
+                            <p>Serverless functions for scalable email campaigns</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📊 Real-time Analytics</h4>
+                            <p>Track delivery status and campaign performance</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔒 Secure & Compliant</h4>
+                            <p>Rate limiting, validation, and error handling</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="log-area" id="logArea">
+                <div class="log-entry log-info">[SYSTEM] Email Marketing Pro with Vercel + Nodemailer initialized</div>
+                <div class="log-entry log-info">[SYSTEM] Ready to send real emails via SMTP</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Account Modal -->
+    <div class="modal" id="emailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Email Account</h2>
+                <button class="modal-close" id="closeModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="providerSelection">
+                    <h3>Select Email Provider</h3>
+                    <div class="provider-grid">
+                        <div class="provider-card" data-provider="gmail">
+                            <div class="provider-icon">📧</div>
+                            <div class="provider-name">Gmail</div>
+                            <div class="provider-description">Google Workspace</div>
+                        </div>
+                        <div class="provider-card" data-provider="outlook">
+                            <div class="provider-icon">📨</div>
+                            <div class="provider-name">Outlook</div>
+                            <div class="provider-description">Microsoft 365</div>
+                        </div>
+                        <div class="provider-card" data-provider="smtp">
+                            <div class="provider-icon">⚙️</div>
+                            <div class="provider-name">Custom SMTP</div>
+                            <div class="provider-description">Any SMTP Server</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="accountForm" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="accountEmail" placeholder="your-email@domain.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password / App Password</label>
+                        <input type="password" class="form-control" id="accountPassword" placeholder="Your app password">
+                    </div>
+                    <div id="smtpSettings" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label">SMTP Server</label>
+                            <input type="text" class="form-control" id="smtpServer" placeholder="smtp.gmail.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" id="smtpPort" value="587" placeholder="587">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Security</label>
+                            <select class="form-control" id="smtpSecurity">
+                                <option value="tls">TLS (Recommended)</option>
+                                <option value="ssl">SSL</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="info-box" id="setupInstructions">
+                        <h4>📋 Setup Instructions</h4>
+                        <div id="instructionContent"></div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="btn btn-secondary" id="testConnection">🔗 Test Connection</button>
+                        <button class="btn btn-success" id="saveAccount">💾 Save Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        const state = {
+            contacts: [],
+            emailAccounts: [],
+            currentCampaign: null,
+            stats: {
+                totalSent: 0,
+                successRate: 0,
+                inQueue: 0,
+                failed: 0
+            }
+        };
+
+        // API Client
+        class EmailMarketingAPI {
+            constructor(baseURL = '') {
+                this.baseURL = baseURL;
+            }
+
+            async sendEmail(emailData) {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/send-email`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(emailData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Failed to send email');
+                    }
+
+                    return result;
+                } catch (error) {
+                    console.error('Send email error:', error);
+                    throw error;
+                }
+            }
+
+            async sendBulkEmails(bulkData) {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/send-bulk-emails`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(bulkData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Failed to send bulk emails');
+                    }
+
+                    return result;
+                } catch (error) {
+                    console.error('Bulk email error:', error);
+                    throw error;
+                }
+            }
+
+            async testConnection(connectionData) {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/test-connection`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(connectionData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Connection test failed');
+                    }
+
+                    return result;
+                } catch (error) {
+                    console.error('Connection test error:', error);
+                    throw error;
+                }
+            }
+        }
+
+        // Initialize API client
+        const emailAPI = new EmailMarketingAPI();
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            setupEventListeners();
+            loadDemoAccounts();
+            updateStats();
+            log('Email Marketing Pro with Vercel + Nodemailer initialized', 'info');
+        }
+
+        function setupEventListeners() {
+            // File upload
+            const uploadZone = document.getElementById('uploadZone');
+            const csvInput = document.getElementById('csvInput');
+            
+            uploadZone.addEventListener('click', () => csvInput.click());
+            uploadZone.addEventListener('dragover', handleDragOver);
+            uploadZone.addEventListener('dragleave', handleDragLeave);
+            uploadZone.addEventListener('drop', handleDrop);
+            csvInput.addEventListener('change', handleFileSelect);
+            
+            // Buttons
+            document.getElementById('startCampaign').addEventListener('click', startCampaign);
+            document.getElementById('addAccountBtn').addEventListener('click', showEmailModal);
+            document.getElementById('previewBtn').addEventListener('click', previewEmail);
+            document.getElementById('testBtn').addEventListener('click', sendTestEmail);
+            document.getElementById('saveBtn').addEventListener('click', saveTemplate);
+            document.getElementById('downloadSample').addEventListener('click', downloadSampleCSV);
+            
+            // Modal
+            document.getElementById('closeModal').addEventListener('click', hideEmailModal);
+            document.getElementById('testConnection').addEventListener('click', testConnection);
+            document.getElementById('saveAccount').addEventListener('click', saveEmailAccount);
+            
+            // Provider selection
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.addEventListener('click', () => selectProvider(card.dataset.provider));
+            });
+        }
+
+        // File handling
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function processFile(file) {
+            if (!file) {
+                log('No file selected', 'error');
+                return;
+            }
+
+            log(`Processing file: ${file.name} (${formatFileSize(file.size)})`, 'info');
+
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                log('Please select a CSV file', 'error');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                log('File is too large. Maximum size is 10MB', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    parseCSV(e.target.result);
+                } catch (error) {
+                    log(`Error processing file: ${error.message}`, 'error');
+                }
+            };
+            
+            reader.onerror = () => {
+                log('Error reading file. Please try again.', 'error');
+            };
+            
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csvData) {
+            const lines = csvData.split('\n').filter(line => line.trim() !== '');
+            
+            if (lines.length < 2) {
+                log('CSV file must have at least a header row and one data row', 'error');
+                return;
+            }
+            
+            const headers = parseCSVLine(lines[0]);
+            log(`Headers detected: ${headers.join(', ')}`, 'info');
+            
+            state.contacts = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line) {
+                    const values = parseCSVLine(line);
+                    const contact = {};
+                    
+                    headers.forEach((header, index) => {
+                        contact[header] = values[index] || '';
+                    });
+                    
+                    // Validate contact has required fields
+                    if (contact.email || Object.values(contact).some(val => val.trim() !== '')) {
+                        state.contacts.push(contact);
+                    }
+                }
+            }
+
+            if (state.contacts.length === 0) {
+                log('No valid contacts found in CSV file', 'error');
+                return;
+            }
+
+            displayContacts();
+            updateMergeFields(headers);
+            updateStats();
+            log(`Successfully loaded ${state.contacts.length} contacts`, 'success');
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            let i = 0;
+            
+            while (i < line.length) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        current += '"';
+                        i += 2;
+                        continue;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+                i++;
+            }
+            
+            result.push(current.trim());
+            return result.map(field => field.replace(/^"(.*)"$/, '$1').trim());
+        }
+
+        function displayContacts() {
+            const preview = document.getElementById('contactsPreview');
+            const list = document.getElementById('contactsList');
+            
+            preview.style.display = 'block';
+            list.innerHTML = '';
+            
+            if (state.contacts.length === 0) {
+                list.innerHTML = '<div class="contact-item"><span class="contact-name">No contacts loaded</span></div>';
+                return;
+            }
+            
+            const contactsToShow = state.contacts.slice(0, 10);
+            contactsToShow.forEach((contact, index) => {
+                const item = document.createElement('div');
+                item.className = 'contact-item';
+                
+                const name = getContactName(contact);
+                const email = getContactEmail(contact);
+                const company = contact.company || contact.Company || '';
+                
+                item.innerHTML = `
+                    <div>
+                        <div class="contact-name">${name}</div>
+                        <div class="contact-email">${email}${company ? ` (${company})` : ''}</div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+
+            if (state.contacts.length > 10) {
+                const moreItem = document.createElement('div');
+                moreItem.className = 'contact-item';
+                moreItem.innerHTML = `<span class="contact-name">...and ${state.contacts.length - 10} more contacts</span>`;
+                list.appendChild(moreItem);
+            }
+        }
+
+        function getContactName(contact) {
+            const firstName = contact.firstName || contact.first_name || contact['First Name'] || '';
+            const lastName = contact.lastName || contact.last_name || contact['Last Name'] || '';
+            const name = contact.name || contact.Name || '';
+            
+            if (firstName || lastName) {
+                return `${firstName} ${lastName}`.trim();
+            }
+            if (name) {
+                return name;
+            }
+            return getContactEmail(contact) || 'Unknown Contact';
+        }
+
+        function getContactEmail(contact) {
+            return contact.email || contact.Email || contact.EMAIL || contact['Email Address'] || '';
+        }
+
+        function updateMergeFields(headers) {
+            const container = document.getElementById('mergeFields');
+            container.innerHTML = '';
+            
+            headers.forEach(header => {
+                const field = document.createElement('button');
+                field.className = 'merge-field';
+                field.textContent = `{{${header}}}`;
+                field.addEventListener('click', () => insertMergeField(`{{${header}}}`));
+                container.appendChild(field);
+            });
+        }
+
+        function insertMergeField(field) {
+            const textarea = document.getElementById('emailContent');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            
+            textarea.value = text.substring(0, start) + field + text.substring(end);
+            textarea.setSelectionRange(start + field.length, start + field.length);
+            textarea.focus();
+        }
+
+        function loadDemoAccounts() {
+            state.emailAccounts = [
+                {
+                    id: 1,
+                    email: 'Add your email account',
+                    provider: 'Click "Add Email Account" to configure',
+                    connected: false,
+                    sentCount: 0,
+                    maxSends: 100
+                }
+            ];
+            renderEmailAccounts();
+        }
+
+        function renderEmailAccounts() {
+            const container = document.getElementById('emailAccounts');
+            container.innerHTML = '';
+            
+            state.emailAccounts.forEach(account => {
+                const accountDiv = document.createElement('div');
+                accountDiv.className = `email-account ${account.connected ? 'connected' : 'disconnected'}`;
+                accountDiv.innerHTML = `
+                    <div class="account-header">
+                        <div>
+                            <div class="account-email">${account.email}</div>
+                            <div class="account-provider">${account.provider}</div>
+                        </div>
+                        <div class="status-badge ${account.connected ? 'status-connected' : 'status-disconnected'}">
+                            ${account.connected ? '✅ Connected' : '❌ Not Connected'}
+                        </div>
+                    </div>
+                    <div class="account-actions">
+                        <button class="btn btn-small ${account.connected ? 'btn-danger' : 'btn-success'}" 
+                                onclick="toggleConnection(${account.id})">
+                            ${account.connected ? 'Disconnect' : 'Connect'}
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="removeAccount(${account.id})">
+                            🗑️ Remove
+                        </button>
+                    </div>
+                `;
+                container.appendChild(accountDiv);
+            });
+        }
+
+        function toggleConnection(accountId) {
+            const account = state.emailAccounts.find(a => a.id === accountId);
+            if (account) {
+                account.connected = !account.connected;
+                renderEmailAccounts();
+                log(`${account.email} ${account.connected ? 'connected' : 'disconnected'}`, 'info');
+            }
+        }
+
+        function removeAccount(accountId) {
+            if (confirm('Are you sure you want to remove this email account?')) {
+                state.emailAccounts = state.emailAccounts.filter(a => a.id !== accountId);
+                renderEmailAccounts();
+                log('Email account removed', 'info');
+            }
+        }
+
+        // Modal functions
+        function showEmailModal() {
+            document.getElementById('emailModal').style.display = 'block';
+            document.getElementById('providerSelection').style.display = 'block';
+            document.getElementById('accountForm').style.display = 'none';
+        }
+
+        function hideEmailModal() {
+            document.getElementById('emailModal').style.display = 'none';
+            resetModalForm();
+        }
+
+        function resetModalForm() {
+            document.getElementById('accountEmail').value = '';
+            document.getElementById('accountPassword').value = '';
+            document.getElementById('smtpServer').value = '';
+            document.getElementById('smtpPort').value = '587';
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+        }
+
+        function selectProvider(provider) {
+            document.querySelectorAll('.provider-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            document.querySelector(`[data-provider="${provider}"]`).classList.add('selected');
+            
+            document.getElementById('providerSelection').style.display = 'none';
+            document.getElementById('accountForm').style.display = 'block';
+            
+            setupProviderConfig(provider);
+        }
+
+        function setupProviderConfig(provider) {
+            const smtpSettings = document.getElementById('smtpSettings');
+            const instructions = document.getElementById('instructionContent');
+            
+            if (provider === 'gmail') {
+                smtpSettings.style.display = 'none';
+                document.getElementById('smtpServer').value = 'smtp.gmail.com';
+                document.getElementById('smtpPort').value = '587';
+                instructions.innerHTML = `
+                    <strong>Gmail Setup:</strong><br>
+                    1. Enable 2-Factor Authentication<br>
+                    2. Go to Google Account → Security → App passwords<br>
+                    3. Generate app password for "Mail"<br>
+                    4. Use your Gmail address and app password<br>
+                    5. SMTP: smtp.gmail.com, Port: 587
+                `;
+            } else if (provider === 'outlook') {
+                smtpSettings.style.display = 'none';
+                document.getElementById('smtpServer').value = 'smtp-mail.outlook.com';
+                document.getElementById('smtpPort').value = '587';
+                instructions.innerHTML = `
+                    <strong>Outlook Setup:</strong><br>
+                    1. Sign in to Microsoft account<br>
+                    2. Go to Security → Advanced security options<br>
+                    3. Create app password for email<br>
+                    4. Use Outlook email and app password<br>
+                    5. SMTP: smtp-mail.outlook.com, Port: 587
+                `;
+            } else if (provider === 'smtp') {
+                smtpSettings.style.display = 'block';
+                instructions.innerHTML = `
+                    <strong>Custom SMTP Setup:</strong><br> 
+                    1. Get SMTP settings from your email provider<br>
+                    2. Common ports: 587 (TLS) or 465 (SSL)<br>
+                    3. Enter your email credentials<br>
+                    4. Test connection before saving
+                `;
+            }
+        }
+
+        async function testConnection() {
+            const email = document.getElementById('accountEmail').value;
+            const password = document.getElementById('accountPassword').value;
+            const host = document.getElementById('smtpServer').value;
+            const port = document.getElementById('smtpPort').value;
+            const security = document.getElementById('smtpSecurity').value;
+            
+            if (!email || !password) {
+                log('Please enter email and password', 'error');
+                return;
+            }
+            
+            try {
+                log('🔗 Testing connection via API...', 'info');
+                document.getElementById('testConnection').disabled = true;
+                
+                const result = await emailAPI.testConnection({
+                    email,
+                    password,
+                    host,
+                    port,
+                    security
+                });
+
+                if (result.success) {
+                    log('✅ Connection successful!', 'success');
+                    document.getElementById('saveAccount').disabled = false;
+                }
+
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+                document.getElementById('saveAccount').disabled = true;
+            } finally {
+                document.getElementById('testConnection').disabled = false;
+            }
+        }
+
+        function saveEmailAccount() {
+            const email = document.getElementById('accountEmail').value;
+            const password = document.getElementById('accountPassword').value;
+            const server = document.getElementById('smtpServer').value;
+            const port = document.getElementById('smtpPort').value;
+            
+            if (!email || !password) {
+                log('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            const newAccount = {
+                id: state.emailAccounts.length + 1,
+                email: email,
+                provider: server.includes('gmail') ? 'Gmail' : server.includes('outlook') ? 'Outlook' : 'SMTP',
+                connected: true,
+                sentCount: 0,
+                maxSends: 100,
+                credentials: {
+                    host: server,
+                    port: port,
+                    password: password
+                }
+            };
+            
+            state.emailAccounts.push(newAccount);
+            renderEmailAccounts();
+            hideEmailModal();
+            log(`✅ Email account added: ${email}`, 'success');
+        }
+
+        // Campaign functions
+        async function startCampaign() {
+            if (state.contacts.length === 0) {
+                log('Please upload contacts first', 'error');
+                return;
+            }
+            
+            const connectedAccounts = state.emailAccounts.filter(a => a.connected);
+            if (connectedAccounts.length === 0) {
+                log('Please connect at least one email account', 'error');
+                return;
+            }
+            
+            const campaignName = document.getElementById('campaignName').value || 'Untitled Campaign';
+            const subject = document.getElementById('subjectLine').value;
+            const content = document.getElementById('emailContent').value;
+            
+            if (!subject || !content) {
+                log('Please fill in subject and content', 'error');
+                return;
+            }
+            
+            try {
+                log(`🚀 Starting campaign: ${campaignName}`, 'info');
+                document.getElementById('startCampaign').disabled = true;
+                
+                const bulkData = {
+                    contacts: state.contacts,
+                    template: {
+                        subject: subject,
+                        content: content
+                    },
+                    fromAccount: connectedAccounts[0],
+                    campaignId: `campaign_${Date.now()}`,
+                    batchSize: 5,
+                    delayBetweenBatches: 2000
+                };
+
+                const result = await emailAPI.sendBulkEmails(bulkData);
+                
+                if (result.success) {
+                    log(`✅ Campaign completed!`, 'success');
+                    log(`📊 Results: ${result.results.sent} sent, ${result.results.failed} failed`, 'info');
+                    
+                    // Update stats
+                    state.stats.totalSent = result.results.sent;
+                    state.stats.failed = result.results.failed;
+                    state.stats.successRate = result.results.successRate;
+                    state.stats.inQueue = 0;
+                    updateStats();
+                    
+                    // Update progress bar
+                    document.getElementById('progressFill').style.width = '100%';
+                    
+                    // Show errors if any
+                    if (result.results.errors.length > 0) {
+                        log(`❌ Failed emails: ${result.results.errors.length}`, 'error');
+                        result.results.errors.forEach(error => {
+                            log(`   • ${error.email}: ${error.error}`, 'error');
+                        });
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Campaign failed: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('startCampaign').disabled = false;
+            }
+        }
+
+        async function sendTestEmail() {
+            const testEmail = prompt('Enter test email address:');
+            if (!testEmail) return;
+            
+            const connectedAccounts = state.emailAccounts.filter(a => a.connected);
+            if (connectedAccounts.length === 0) {
+                log('No connected email accounts available', 'error');
+                return;
+            }
+            
+            const subject = document.getElementById('subjectLine').value || 'Test Email';
+            const content = document.getElementById('emailContent').value || 'This is a test email from Email Marketing Pro.';
+            
+            try {
+                log(`📧 Sending test email to ${testEmail}...`, 'info');
+                
+                const result = await emailAPI.sendEmail({
+                    to: testEmail,
+                    subject: subject,
+                    content: content,
+                    fromAccount: connectedAccounts[0],
+                    isHtml: true
+                });
+
+                if (result.success) {
+                    log(`✅ Test email sent successfully to ${testEmail}`, 'success');
+                    log(`📧 Message ID: ${result.messageId}`, 'info');
+                }
+
+            } catch (error) {
+                log(`❌ Test email failed: ${error.message}`, 'error');
+            }
+        }
+
+        function previewEmail() {
+            const subject = document.getElementById('subjectLine').value;
+            const content = document.getElementById('emailContent').value;
+            
+            if (state.contacts.length === 0) {
+                log('Please upload contacts to preview email', 'error');
+                return;
+            }
+            
+            const sampleContact = state.contacts[0];
+            const previewSubject = personalizeTemplate(subject, sampleContact);
+            const previewContent = personalizeTemplate(content, sampleContact);
+            
+            const previewWindow = window.open('', '_blank', 'width=700,height=500');
+            previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Email Preview</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+                        .preview-header { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                        .preview-subject { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+                        .preview-content { background: white; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="preview-header">
+                        <div class="preview-subject">Subject: ${previewSubject}</div>
+                        <div>To: ${getContactEmail(sampleContact)}</div>
+                    </div>
+                    <div class="preview-content">
+                        <div style="white-space: pre-wrap;">${previewContent}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            log('📧 Email preview opened', 'info');
+        }
+
+        function saveTemplate() {
+            const templateName = document.getElementById('templateName').value || 'Untitled Template';
+            const template = {
+                name: templateName,
+                subject: document.getElementById('subjectLine').value,
+                content: document.getElementById('emailContent').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Save to localStorage for now
+            localStorage.setItem(`template_${Date.now()}`, JSON.stringify(template));
+            log(`💾 Template "${templateName}" saved successfully`, 'success');
+        }
+
+        function downloadSampleCSV() {
+            const sampleData = `firstName,lastName,email,company,phone,position
+John,Doe,john.doe@example.com,Acme Corp,555-0123,Marketing Manager
+Jane,Smith,jane.smith@example.com,Tech Solutions,555-0456,Sales Director
+Bob,Johnson,bob.johnson@example.com,Digital Agency,555-0789,CEO
+Alice,Brown,alice.brown@example.com,StartupCo,555-0321,Product Manager
+Mike,Wilson,mike.wilson@example.com,Innovation Labs,555-0654,Developer
+Sarah,Davis,sarah.davis@example.com,Creative Studio,555-0987,Designer
+Tom,Miller,tom.miller@example.com,Consulting Group,555-0246,Consultant
+Lisa,Garcia,lisa.garcia@example.com,E-commerce Plus,555-0135,Marketing Lead`;
+
+            const blob = new Blob([sampleData], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sample_contacts.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log('📥 Sample CSV downloaded', 'success');
+        }
+
+        function personalizeTemplate(template, contact) {
+            if (!template || typeof template !== 'string') {
+                return template;
+            }
+            
+            let personalized = template;
+            Object.keys(contact).forEach(key => {
+                const regex = new RegExp(`{{${key}}}`, 'g');
+                personalized = personalized.replace(regex, contact[key] || '');
+            });
+            
+            // Remove any remaining unreplaced merge fields
+            personalized = personalized.replace(/{{[^}]*}}/g, '');
+            
+            return personalized;
+        }
+
+        function updateStats() {
+            document.getElementById('totalSent').textContent = state.stats.totalSent;
+            document.getElementById('successRate').textContent = state.stats.successRate + '%';
+            document.getElementById('inQueue').textContent = state.stats.inQueue;
+            document.getElementById('failedCount').textContent = state.stats.failed;
+        }
+
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+            
+            // Keep only last 100 log entries
+            const entries = logArea.querySelectorAll('.log-entry');
+            if (entries.length > 100) {
+                entries[0].remove();
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Make functions globally available
+        window.toggleConnection = toggleConnection;
+        window.removeAccount = removeAccount;
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('emailModal');
+            if (event.target === modal) {
+                hideEmailModal();
+            }
+        }
+    </script>
+</body>
+</html>
+          
