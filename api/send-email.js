@@ -10,54 +10,100 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
   try {
-    const { to, subject, content, fromAccount, campaignId, isHtml = true } = req.body;
+    const { to, subject, content } = req.body;
 
-    if (!to || !subject || !content) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Missing required fields' 
-      });
+    // Detailed logging
+    console.log('=== EMAIL SENDING DEBUG ===');
+    console.log('From:', process.env.SMTP_USER);
+    console.log('To:', to);
+    console.log('Password length:', process.env.SMTP_PASSWORD?.length);
+    console.log('Password first 4 chars:', process.env.SMTP_PASSWORD?.substring(0, 4));
+
+    // Try different Gmail configurations
+    const smtpConfigs = [
+      {
+        name: 'Gmail Service',
+        config: {
+          service: 'gmail',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASSWORD
+          }
+        }
+      },
+      {
+        name: 'Gmail SMTP',
+        config: {
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASSWORD
+          },
+          tls: {
+            rejectUnauthorized: false
+          }
+        }
+      },
+      {
+        name: 'Gmail SSL',
+        config: {
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASSWORD
+          }
+        }
+      }
+    ];
+
+    let lastError = null;
+
+    for (const smtpConfig of smtpConfigs) {
+      try {
+        console.log(`Trying ${smtpConfig.name}...`);
+        const transporter = nodemailer.createTransport(smtpConfig.config);
+        
+        // Test connection
+        await transporter.verify();
+        console.log(`${smtpConfig.name} connection successful!`);
+
+        const mailOptions = {
+          from: process.env.SMTP_USER,
+          to: to,
+          subject: subject,
+          html: content
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+        console.log(`Email sent successfully via ${smtpConfig.name}`);
+
+        return res.status(200).json({ 
+          success: true, 
+          messageId: result.messageId,
+          method: smtpConfig.name
+        });
+
+      } catch (error) {
+        console.log(`${smtpConfig.name} failed:`, error.message);
+        lastError = error;
+        continue;
+      }
     }
 
-    // SMTP configuration
-    const smtpConfig = {
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
-      }
-    };
-
-    // CORRECT FUNCTION NAME - createTransport (not createTransporter)
-    const transporter = nodemailer.createTransport(smtpConfig);
-
-    const mailOptions = {
-      from: process.env.SMTP_USER,
-      to: to,
-      subject: subject,
-      html: content
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-
-    return res.status(200).json({ 
-      success: true, 
-      messageId: result.messageId,
-      recipient: to
-    });
+    // If all methods failed
+    throw lastError;
 
   } catch (error) {
-    console.error('Email error:', error);
+    console.error('All methods failed:', error);
     return res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      code: error.code
     });
   }
 };
