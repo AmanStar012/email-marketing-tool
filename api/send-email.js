@@ -16,29 +16,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { 
-      to, 
-      subject, 
-      content, 
-      fromAccount, 
-      campaignId,
-      isHtml = true 
-    } = req.body;
+    const { to, subject, content, fromAccount, campaignId, isHtml = true } = req.body;
 
-    // Validate required fields
-    if (!to || !subject || !content || !fromAccount) {
+    if (!to || !subject || !content) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: to, subject, content, fromAccount' 
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(to)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid email format' 
+        error: 'Missing required fields' 
       });
     }
 
@@ -48,64 +31,35 @@ module.exports = async function handler(req, res) {
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER || fromAccount.email,
-        pass: process.env.SMTP_PASSWORD || fromAccount.password
-      },
-      tls: {
-        rejectUnauthorized: false
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
       }
     };
 
-    // Create transporter - FIXED
+    // Create transporter - THIS IS THE FIX
     const transporter = nodemailer.createTransporter(smtpConfig);
-
-    // Verify connection
-    await transporter.verify();
 
     // Send email
     const mailOptions = {
-      from: {
-        name: fromAccount.name || 'Email Marketing Tool',
-        address: fromAccount.email || process.env.SMTP_USER
-      },
+      from: process.env.SMTP_USER,
       to: to,
       subject: subject,
-      ...(isHtml ? { html: content } : { text: content }),
-      headers: {
-        'X-Campaign-ID': campaignId || 'single-email',
-        'X-Mailer': 'Email Marketing Pro'
-      }
+      html: content
     };
 
     const result = await transporter.sendMail(mailOptions);
 
-    console.log(`Email sent successfully to ${to}, Message ID: ${result.messageId}`);
-
     return res.status(200).json({ 
       success: true, 
       messageId: result.messageId,
-      recipient: to,
-      timestamp: new Date().toISOString()
+      recipient: to
     });
 
   } catch (error) {
-    console.error('Email sending error:', error);
-    
-    let errorMessage = 'Failed to send email';
-    if (error.code === 'EAUTH') {
-      errorMessage = 'Authentication failed. Check your email credentials.';
-    } else if (error.code === 'ECONNECTION') {
-      errorMessage = 'Connection failed. Check your SMTP settings.';
-    } else if (error.responseCode === 550) {
-      errorMessage = 'Recipient email address rejected.';
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
+    console.error('Email error:', error);
     return res.status(500).json({ 
       success: false, 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: error.message 
     });
   }
 };

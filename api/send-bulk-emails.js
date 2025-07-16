@@ -1,7 +1,6 @@
 const nodemailer = require('nodemailer');
 
 module.exports = async function handler(req, res) {
-  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,26 +15,12 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { 
-      contacts, 
-      template, 
-      fromAccount, 
-      campaignId,
-      batchSize = 5,
-      delayBetweenBatches = 2000
-    } = req.body;
+    const { contacts, template, fromAccount, campaignId, batchSize = 5 } = req.body;
 
-    if (!contacts || !template || !fromAccount) {
+    if (!contacts || !template) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: contacts, template, fromAccount' 
-      });
-    }
-
-    if (!Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Contacts must be a non-empty array' 
+        error: 'Missing required fields' 
       });
     }
 
@@ -45,85 +30,64 @@ module.exports = async function handler(req, res) {
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER || fromAccount.email,
-        pass: process.env.SMTP_PASSWORD || fromAccount.password
-      },
-      tls: {
-        rejectUnauthorized: false
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
       }
     };
 
-    // Create transporter - FIXED
+    // Create transporter - THIS IS THE FIX
     const transporter = nodemailer.createTransporter(smtpConfig);
-    await transporter.verify();
 
     const results = {
       total: contacts.length,
       sent: 0,
       failed: 0,
-      errors: [],
-      startTime: new Date().toISOString()
+      errors: []
     };
 
-    // Process emails in batches
-    for (let i = 0; i < contacts.length; i += batchSize) {
-      const batch = contacts.slice(i, i + batchSize);
+    // Send emails
+    for (let i = 0; i < contacts.length; i++) {
+      const contact = contacts[i];
       
-      const batchPromises = batch.map(async (contact) => {
-        try {
-          if (!contact.email) {
-            throw new Error('Contact missing email address');
-          }
-
-          const personalizedSubject = personalizeTemplate(template.subject, contact);
-          const personalizedContent = personalizeTemplate(template.content, contact);
-
-          const mailOptions = {
-            from: {
-              name: fromAccount.name || 'Email Marketing Tool',
-              address: fromAccount.email || process.env.SMTP_USER
-            },
-            to: contact.email,
-            subject: personalizedSubject,
-            html: personalizedContent,
-            headers: {
-              'X-Campaign-ID': campaignId || 'bulk-campaign',
-              'X-Contact-ID': contact.id || contact.email
-            }
-          };
-
-          const result = await transporter.sendMail(mailOptions);
-          results.sent++;
-          
-          return { 
-            success: true, 
-            email: contact.email, 
-            messageId: result.messageId 
-          };
-
-        } catch (error) {
-          results.failed++;
-          results.errors.push({
-            email: contact.email || 'unknown',
-            error: error.message
-          });
-          
-          return { 
-            success: false, 
-            email: contact.email || 'unknown', 
-            error: error.message 
-          };
+      try {
+        if (!contact.email) {
+          throw new Error('No email address');
         }
-      });
 
-      await Promise.all(batchPromises);
+        // Personalize template
+        let personalizedSubject = template.subject;
+        let personalizedContent = template.content;
+        
+        Object.keys(contact).forEach(key => {
+          const regex = new RegExp(`{{${key}}}`, 'g');
+          personalizedSubject = personalizedSubject.replace(regex, contact[key] || '');
+          personalizedContent = personalizedContent.replace(regex, contact[key] || '');
+        });
 
-      if (i + batchSize < contacts.length) {
-        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+        const mailOptions = {
+          from: process.env.SMTP_USER,
+          to: contact.email,
+          subject: personalizedSubject,
+          html: personalizedContent
+        };
+
+        await transporter.sendMail(mailOptions);
+        results.sent++;
+        
+        // Delay between emails
+        if (i < contacts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+      } catch (error) {
+        results.failed++;
+        results.errors.push({
+          email: contact.email || 'unknown',
+          error: error.message
+        });
       }
     }
 
-    results.endTime = new Date().toISOString();
     results.successRate = results.total > 0 ? Math.round((results.sent / results.total) * 100) : 0;
 
     return res.status(200).json({ 
@@ -135,24 +99,7 @@ module.exports = async function handler(req, res) {
     console.error('Bulk email error:', error);
     return res.status(500).json({ 
       success: false, 
-      error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 };
-
-function personalizeTemplate(template, contact) {
-  if (!template || typeof template !== 'string') {
-    return template;
-  }
-  
-  let personalized = template;
-  Object.keys(contact).forEach(key => {
-    const regex = new RegExp(`{{${key}}}`, 'g');
-    personalized = personalized.replace(regex, contact[key] || '');
-  });
-  
-  personalized = personalized.replace(/{{[^}]*}}/g, '');
-  
-  return personalized;
-}
