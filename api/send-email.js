@@ -1,7 +1,6 @@
 const nodemailer = require('nodemailer');
 
 module.exports = async function handler(req, res) {
-  // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -36,10 +35,9 @@ module.exports = async function handler(req, res) {
       }
     };
 
-    // Create transporter - THIS IS THE FIX
-    const transporter = nodemailer.createTransporter(smtpConfig);
+    // CORRECT FUNCTION NAME - createTransport (not createTransporter)
+    const transporter = nodemailer.createTransport(smtpConfig);
 
-    // Send email
     const mailOptions = {
       from: process.env.SMTP_USER,
       to: to,

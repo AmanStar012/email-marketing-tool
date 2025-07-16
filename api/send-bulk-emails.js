@@ -35,8 +35,8 @@ module.exports = async function handler(req, res) {
       }
     };
 
-    // Create transporter - THIS IS THE FIX
-    const transporter = nodemailer.createTransporter(smtpConfig);
+    // CORRECT FUNCTION NAME - createTransport
+    const transporter = nodemailer.createTransport(smtpConfig);
 
     const results = {
       total: contacts.length,
