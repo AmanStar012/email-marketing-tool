@@ -14,17 +14,15 @@ module.exports = async function handler(req, res) {
     const { to, subject, content } = req.body;
 
     const transporter = nodemailer.createTransport({
-      host: 'sandbox.smtp.mailtrap.io',
-      port: 2525,
-      secure: false,
+      service: 'gmail',
       auth: {
-        user: 'c2418473e9f491',
-        pass: '3320713de2d339'
+        user: '2003aman01.sharma@gmail.com',
+        pass: 'phszxjngntaqqncj'
       }
     });
 
     const result = await transporter.sendMail({
-      from: 'test@example.com',
+      from: '2003aman01.sharma@gmail.com',
       to: to,
       subject: subject,
       html: content

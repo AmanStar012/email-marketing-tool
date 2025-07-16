@@ -13,13 +13,12 @@ module.exports = async function handler(req, res) {
   try {
     const { contacts, template } = req.body;
 
+    // Direct Gmail Configuration
     const transporter = nodemailer.createTransport({
-      host: 'sandbox.smtp.mailtrap.io',
-      port: 2525,
-      secure: false,
+      service: 'gmail',
       auth: {
-        user: 'c2418473e9f491',
-        pass: '3320713de2d339'
+        user: '2003aman01.sharma@gmail.com',
+        pass: 'phszxjngntaqqncj'
       }
     });
 
@@ -44,14 +43,15 @@ module.exports = async function handler(req, res) {
         });
 
         await transporter.sendMail({
-          from: 'test@example.com',
+          from: '2003aman01.sharma@gmail.com',
           to: contact.email,
           subject: personalizedSubject,
           html: personalizedContent
         });
 
         results.sent++;
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log(`✅ Email sent to ${contact.email}`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
         results.failed++;
@@ -59,6 +59,7 @@ module.exports = async function handler(req, res) {
           email: contact.email || 'unknown',
           error: error.message
         });
+        console.log(`❌ Failed: ${contact.email}`);
       }
     }
 
