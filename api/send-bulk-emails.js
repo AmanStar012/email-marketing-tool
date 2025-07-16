@@ -11,29 +11,17 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { contacts, template, fromAccount, campaignId, batchSize = 5 } = req.body;
+    const { contacts, template } = req.body;
 
-    if (!contacts || !template) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Missing required fields' 
-      });
-    }
-
-    console.log('=== MAILTRAP BULK EMAIL SENDING ===');
-    console.log('Total contacts:', contacts.length);
-
-    const smtpConfig = {
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
+    const transporter = nodemailer.createTransport({
+      host: 'sandbox.smtp.mailtrap.io',
+      port: 2525,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
+        user: 'c2418473e9f491',
+        pass: '3320713de2d339'
       }
-    };
-
-    const transporter = nodemailer.createTransport(smtpConfig);
+    });
 
     const results = {
       total: contacts.length,
@@ -42,16 +30,10 @@ module.exports = async function handler(req, res) {
       errors: []
     };
 
-    // Send emails
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
       
       try {
-        if (!contact.email) {
-          throw new Error('No email address');
-        }
-
-        // Personalize template
         let personalizedSubject = template.subject;
         let personalizedContent = template.content;
         
@@ -61,21 +43,15 @@ module.exports = async function handler(req, res) {
           personalizedContent = personalizedContent.replace(regex, contact[key] || '');
         });
 
-        const mailOptions = {
+        await transporter.sendMail({
           from: 'test@example.com',
           to: contact.email,
           subject: personalizedSubject,
           html: personalizedContent
-        };
+        });
 
-        await transporter.sendMail(mailOptions);
         results.sent++;
-        console.log(`✅ Email sent to ${contact.email}`);
-        
-        // Small delay between emails
-        if (i < contacts.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+        await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (error) {
         results.failed++;
@@ -83,7 +59,6 @@ module.exports = async function handler(req, res) {
           email: contact.email || 'unknown',
           error: error.message
         });
-        console.log(`❌ Failed to send to ${contact.email}: ${error.message}`);
       }
     }
 
@@ -95,7 +70,6 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Bulk email error:', error);
     return res.status(500).json({ 
       success: false, 
       error: error.message

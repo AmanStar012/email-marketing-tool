@@ -13,43 +13,29 @@ module.exports = async function handler(req, res) {
   try {
     const { to, subject, content } = req.body;
 
-    console.log('=== MAILTRAP EMAIL SENDING ===');
-    console.log('Host:', process.env.SMTP_HOST);
-    console.log('Port:', process.env.SMTP_PORT);
-    console.log('User:', process.env.SMTP_USER);
-    console.log('To:', to);
-
-    const smtpConfig = {
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
+    const transporter = nodemailer.createTransport({
+      host: 'sandbox.smtp.mailtrap.io',
+      port: 2525,
       secure: false,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
+        user: 'c2418473e9f491',
+        pass: '3320713de2d339'
       }
-    };
+    });
 
-    const transporter = nodemailer.createTransport(smtpConfig);
-
-    const mailOptions = {
+    const result = await transporter.sendMail({
       from: 'test@example.com',
       to: to,
       subject: subject,
       html: content
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully via Mailtrap!');
-    console.log('Message ID:', result.messageId);
+    });
 
     return res.status(200).json({ 
       success: true, 
-      messageId: result.messageId,
-      service: 'Mailtrap'
+      messageId: result.messageId
     });
 
   } catch (error) {
-    console.error('❌ Mailtrap error:', error);
     return res.status(500).json({ 
       success: false, 
       error: error.message

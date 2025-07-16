@@ -10,34 +10,17 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
-  }
-
   try {
-    const { email, password, host, port } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Email and password required' 
-      });
-    }
-
-    const smtpConfig = {
-      host: host || 'smtp.gmail.com',
-      port: parseInt(port) || 587,
+    const transporter = nodemailer.createTransport({
+      host: 'sandbox.smtp.mailtrap.io',
+      port: 2525,
       secure: false,
       auth: {
-        user: email,
-        pass: password
+        user: 'c2418473e9f491',
+        pass: '3320713de2d339'
       }
-    };
+    });
 
-    // CORRECT FUNCTION NAME - createTransport
-    const transporter = nodemailer.createTransport(smtpConfig);
-    
-    // Test connection
     await transporter.verify();
 
     return res.status(200).json({ 
@@ -46,7 +29,6 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Connection test error:', error);
     return res.status(400).json({ 
       success: false, 
       error: error.message
