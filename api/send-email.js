@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -42,11 +42,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get SMTP configuration
+    // SMTP configuration
     const smtpConfig = {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false, // true for 465, false for other ports
+      secure: false,
       auth: {
         user: process.env.SMTP_USER || fromAccount.email,
         pass: process.env.SMTP_PASSWORD || fromAccount.password
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       }
     };
 
-    // Create transporter
+    // Create transporter - FIXED
     const transporter = nodemailer.createTransporter(smtpConfig);
 
     // Verify connection
@@ -79,7 +79,6 @@ export default async function handler(req, res) {
 
     const result = await transporter.sendMail(mailOptions);
 
-    // Log successful send
     console.log(`Email sent successfully to ${to}, Message ID: ${result.messageId}`);
 
     return res.status(200).json({ 
@@ -92,7 +91,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Email sending error:', error);
     
-    // Return specific error messages
     let errorMessage = 'Failed to send email';
     if (error.code === 'EAUTH') {
       errorMessage = 'Authentication failed. Check your email credentials.';
@@ -110,4 +108,4 @@ export default async function handler(req, res) {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-}
+};

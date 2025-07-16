@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       }
     };
 
+    // Create transporter - FIXED
     const transporter = nodemailer.createTransporter(smtpConfig);
     await transporter.verify();
 
@@ -70,12 +71,10 @@ export default async function handler(req, res) {
       
       const batchPromises = batch.map(async (contact) => {
         try {
-          // Validate contact has email
           if (!contact.email) {
             throw new Error('Contact missing email address');
           }
 
-          // Personalize template
           const personalizedSubject = personalizeTemplate(template.subject, contact);
           const personalizedContent = personalizeTemplate(template.content, contact);
 
@@ -119,7 +118,6 @@ export default async function handler(req, res) {
 
       await Promise.all(batchPromises);
 
-      // Delay between batches to avoid rate limiting
       if (i + batchSize < contacts.length) {
         await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
       }
@@ -141,7 +139,7 @@ export default async function handler(req, res) {
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-}
+};
 
 function personalizeTemplate(template, contact) {
   if (!template || typeof template !== 'string') {
@@ -154,7 +152,6 @@ function personalizeTemplate(template, contact) {
     personalized = personalized.replace(regex, contact[key] || '');
   });
   
-  // Remove any remaining unreplaced merge fields
   personalized = personalized.replace(/{{[^}]*}}/g, '');
   
   return personalized;
