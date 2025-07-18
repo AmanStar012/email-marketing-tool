@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Marketing Tool - Vercel + Nodemailer</title>
+    <title>Email Marketing Tool - 5 Account System</title>
     <style>
         * {
             margin: 0;
@@ -388,6 +388,17 @@
             background: linear-gradient(135deg, #f8d7da, #f5c6cb);
         }
 
+        .active-account {
+            border: 2px solid #27ae60 !important;
+            background: linear-gradient(135deg, #d1e7dd, #c3e6cb) !important;
+            box-shadow: 0 0 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .active-account .account-email {
+            font-weight: bold;
+            color: #155724;
+        }
+
         .account-header {
             display: flex;
             justify-content: space-between;
@@ -426,6 +437,7 @@
             display: flex;
             gap: 8px;
             margin-top: 15px;
+            flex-wrap: wrap;
         }
 
         .progress-container {
@@ -499,115 +511,35 @@
         .log-warning { color: #f39c12; }
         .log-info { color: #3498db; }
 
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 1000;
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: white;
-            margin: 5% auto;
-            padding: 0;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            animation: modalSlideIn 0.3s ease;
-        }
-
-        @keyframes modalSlideIn {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .modal-header {
-            padding: 25px 30px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-size: 1.3em;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #7f8c8d;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-        }
-
-        .modal-close:hover {
+        .account-selector {
             background: #f8f9fa;
-            color: #2c3e50;
-        }
-
-        .modal-body {
-            padding: 30px;
-        }
-
-        .provider-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        .provider-card {
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
             padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
         }
 
-        .provider-card:hover {
-            border-color: #3498db;
-            background: #f8f9ff;
-            transform: translateY(-2px);
+        .selector-title {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
         }
 
-        .provider-card.selected {
-            border-color: #3498db;
-            background: #e3f2fd;
-        }
-
-        .provider-icon {
-            font-size: 2.5em;
+        .selector-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
             margin-bottom: 15px;
         }
 
-        .provider-name {
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-
-        .provider-description {
-            font-size: 12px;
-            color: #7f8c8d;
+        .active-info {
+            font-size: 13px;
+            color: #666;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
         }
 
         .action-buttons {
@@ -615,53 +547,6 @@
             gap: 15px;
             flex-wrap: wrap;
             margin-top: 25px;
-        }
-
-        .info-box {
-            background: linear-gradient(135deg, #e3f2fd, #f8f9ff);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #bee5eb;
-            margin-top: 20px;
-        }
-
-        .info-box h4 {
-            color: #0c5460;
-            margin-bottom: 15px;
-            font-size: 1.1em;
-        }
-
-        .info-box p {
-            color: #0c5460;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 10px;
-        }
-
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .feature-card {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            padding: 20px;
-            border-radius: 12px;
-            border: 1px solid #dee2e6;
-        }
-
-        .feature-card h4 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 1em;
-        }
-
-        .feature-card p {
-            color: #6c757d;
-            font-size: 13px;
-            line-height: 1.5;
         }
 
         @media (max-width: 768px) {
@@ -682,6 +567,10 @@
             .section {
                 padding: 20px;
             }
+            
+            .selector-buttons {
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -689,7 +578,7 @@
     <div class="container">
         <div class="header">
             <h1>🚀 Email Marketing Pro</h1>
-            <p>Real email sending with Vercel + Nodemailer</p>
+            <p>5-Account Gmail System with Auto-Rotation</p>
             <div class="stats-grid">
                 <div class="stat-card">
                     <span class="stat-number" id="totalSent">0</span>
@@ -775,8 +664,8 @@
                         <label class="form-label">Send Rate</label>
                         <select class="form-control" id="sendRate">
                             <option value="30">30 emails/hour per account</option>
+                            <option value="40">40 emails/hour per account</option>
                             <option value="50">50 emails/hour per account</option>
-                            <option value="100">100 emails/hour per account</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -796,51 +685,15 @@
                 <div class="section">
                     <div class="section-header">
                         <div class="section-icon">4</div>
-                        <div class="section-title">Email Accounts</div>
+                        <div class="section-title">Email Accounts (5-Account System)</div>
                     </div>
                     <div class="email-accounts" id="emailAccounts"></div>
-                    <button class="btn" id="addAccountBtn">
-                        ➕ Add Email Account
-                    </button>
                     
-                    <div class="info-box">
-                        <h4>📧 Email Service Integration</h4>
-                        <p><strong>Gmail/Google Workspace:</strong> Enable 2FA and generate app password</p>
-                        <p><strong>Outlook/Microsoft 365:</strong> Use OAuth2 authentication</p>
-                        <p><strong>Custom SMTP:</strong> Contact your provider for settings</p>
-                    </div>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="section">
-                    <div class="section-header">
-                        <div class="section-icon">⚡</div>
-                        <div class="section-title">Quick Actions</div>
-                    </div>
                     <div class="action-buttons">
                         <button class="btn btn-small" id="previewBtn">👁️ Preview</button>
                         <button class="btn btn-small" id="testBtn">🧪 Test Send</button>
                         <button class="btn btn-small" id="saveBtn">💾 Save Template</button>
                         <button class="btn btn-small btn-secondary" id="downloadSample">📥 Sample CSV</button>
-                    </div>
-                    
-                    <div class="feature-grid">
-                        <div class="feature-card">
-                            <h4>✅ Real Email Sending</h4>
-                            <p>Powered by Nodemailer with actual SMTP delivery</p>
-                        </div>
-                        <div class="feature-card">
-                            <h4>🚀 Vercel Deployment</h4>
-                            <p>Serverless functions for scalable email campaigns</p>
-                        </div>
-                        <div class="feature-card">
-                            <h4>📊 Real-time Analytics</h4>
-                            <p>Track delivery status and campaign performance</p>
-                        </div>
-                        <div class="feature-card">
-                            <h4>🔒 Secure & Compliant</h4>
-                            <p>Rate limiting, validation, and error handling</p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -852,84 +705,13 @@
                 <div class="progress-fill" id="progressFill"></div>
             </div>
             <div class="log-area" id="logArea">
-                <div class="log-entry log-info">[SYSTEM] Email Marketing Pro with Vercel + Nodemailer initialized</div>
-                <div class="log-entry log-info">[SYSTEM] Ready to send real emails via SMTP</div>
+                <div class="log-entry log-info">[SYSTEM] 5-Account Email Marketing Pro initialized</div>
+                <div class="log-entry log-info">[SYSTEM] Auto-rotation enabled - 40 emails per account</div>
             </div>
         </div>
     </div>
 
-    <!-- Email Account Modal -->
-    <div class="modal" id="emailModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Add Email Account</h2>
-                <button class="modal-close" id="closeModal">×</button>
-            </div>
-            <div class="modal-body">
-                <div id="providerSelection">
-                    <h3>Select Email Provider</h3>
-                    <div class="provider-grid">
-                        <div class="provider-card" data-provider="gmail">
-                            <div class="provider-icon">📧</div>
-                            <div class="provider-name">Gmail</div>
-                            <div class="provider-description">Google Workspace</div>
-                        </div>
-                        <div class="provider-card" data-provider="outlook">
-                            <div class="provider-icon">📨</div>
-                            <div class="provider-name">Outlook</div>
-                            <div class="provider-description">Microsoft 365</div>
-                        </div>
-                        <div class="provider-card" data-provider="smtp">
-                            <div class="provider-icon">⚙️</div>
-                            <div class="provider-name">Custom SMTP</div>
-                            <div class="provider-description">Any SMTP Server</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="accountForm" style="display: none;">
-                    <div class="form-group">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" class="form-control" id="accountEmail" placeholder="your-email@domain.com">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password / App Password</label>
-                        <input type="password" class="form-control" id="accountPassword" placeholder="Your app password">
-                    </div>
-                    <div id="smtpSettings" style="display: none;">
-                        <div class="form-group">
-                            <label class="form-label">SMTP Server</label>
-                            <input type="text" class="form-control" id="smtpServer" placeholder="smtp.gmail.com">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Port</label>
-                            <input type="number" class="form-control" id="smtpPort" value="587" placeholder="587">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Security</label>
-                            <select class="form-control" id="smtpSecurity">
-                                <option value="tls">TLS (Recommended)</option>
-                                <option value="ssl">SSL</option>
-                                <option value="none">None</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="info-box" id="setupInstructions">
-                        <h4>📋 Setup Instructions</h4>
-                        <div id="instructionContent"></div>
-                    </div>
-                    
-                    <div class="action-buttons">
-                        <button class="btn btn-secondary" id="testConnection">🔗 Test Connection</button>
-                        <button class="btn btn-success" id="saveAccount">💾 Save Account</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<script>
+    <script>
         // Global State
         const state = {
             contacts: [],
@@ -943,7 +725,7 @@
             }
         };
 
-        // API Client - NO NODEMAILER IMPORT NEEDED
+        // API Client
         class EmailMarketingAPI {
             constructor(baseURL = '') {
                 this.baseURL = baseURL;
@@ -994,29 +776,6 @@
                     throw error;
                 }
             }
-
-            async testConnection(connectionData) {
-                try {
-                    const response = await fetch(`${this.baseURL}/api/test-connection`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(connectionData)
-                    });
-
-                    const result = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(result.error || 'Connection test failed');
-                    }
-
-                    return result;
-                } catch (error) {
-                    console.error('Connection test error:', error);
-                    throw error;
-                }
-            }
         }
 
         // Initialize API client
@@ -1031,7 +790,7 @@
             setupEventListeners();
             loadDemoAccounts();
             updateStats();
-            log('Email Marketing Pro with Vercel + Nodemailer initialized', 'info');
+            log('5-Account Email Marketing Pro initialized', 'info');
         }
 
         function setupEventListeners() {
@@ -1040,24 +799,12 @@
             
             // Other event listeners
             document.getElementById('startCampaign').addEventListener('click', startCampaign);
-            document.getElementById('addAccountBtn').addEventListener('click', showEmailModal);
             document.getElementById('previewBtn').addEventListener('click', previewEmail);
             document.getElementById('testBtn').addEventListener('click', sendTestEmail);
             document.getElementById('saveBtn').addEventListener('click', saveTemplate);
             document.getElementById('downloadSample').addEventListener('click', downloadSampleCSV);
-            
-            // Modal event listeners
-            document.getElementById('closeModal').addEventListener('click', hideEmailModal);
-            document.getElementById('testConnection').addEventListener('click', testConnection);
-            document.getElementById('saveAccount').addEventListener('click', saveEmailAccount);
-            
-            // Provider selection
-            document.querySelectorAll('.provider-card').forEach(card => {
-                card.addEventListener('click', () => selectProvider(card.dataset.provider));
-            });
         }
 
-        // Make sure the upload zone is properly initialized
         function initializeUploadZone() {
             const uploadZone = document.getElementById('uploadZone');
             const csvInput = document.getElementById('csvInput');
@@ -1067,24 +814,19 @@
                 return;
             }
             
-            // Click to upload
             uploadZone.addEventListener('click', function(e) {
                 e.preventDefault();
                 csvInput.click();
             });
             
-            // Drag and drop
             uploadZone.addEventListener('dragover', handleDragOver);
             uploadZone.addEventListener('dragleave', handleDragLeave);
             uploadZone.addEventListener('drop', handleDrop);
-            
-            // File input change
             csvInput.addEventListener('change', handleFileSelect);
             
             log('Upload zone initialized successfully', 'info');
         }
 
-        // File handling functions - FIXED
         function handleDragOver(e) {
             e.preventDefault();
             e.currentTarget.classList.add('dragover');
@@ -1118,19 +860,16 @@
 
             log(`Processing file: ${file.name} (${formatFileSize(file.size)})`, 'info');
 
-            // Check file type
             if (!file.name.toLowerCase().endsWith('.csv')) {
                 log('Please select a CSV file', 'error');
                 return;
             }
 
-            // Check file size (10MB limit)
             if (file.size > 10 * 1024 * 1024) {
                 log('File is too large. Maximum size is 10MB', 'error');
                 return;
             }
 
-            // Read file
             const reader = new FileReader();
             
             reader.onload = function(e) {
@@ -1159,26 +898,21 @@
                     return;
                 }
                 
-                // Parse headers
                 const headers = parseCSVLine(lines[0]);
                 log(`Headers detected: ${headers.join(', ')}`, 'info');
                 
-                // Clear existing contacts
                 state.contacts = [];
                 
-                // Parse data rows
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (line) {
                         const values = parseCSVLine(line);
                         const contact = {};
                         
-                        // Map values to headers
                         headers.forEach((header, index) => {
                             contact[header] = values[index] || '';
                         });
                         
-                        // Only add contact if it has at least an email or name
                         const hasEmail = contact.email || contact.Email || contact.EMAIL;
                         const hasName = contact.firstName || contact.lastName || contact.name || contact.Name;
                         
@@ -1193,7 +927,6 @@
                     return;
                 }
 
-                // Update UI
                 displayContacts();
                 updateMergeFields(headers);
                 updateStats();
@@ -1216,16 +949,13 @@
                 
                 if (char === '"') {
                     if (inQuotes && nextChar === '"') {
-                        // Escaped quote
                         current += '"';
                         i += 2;
                         continue;
                     } else {
-                        // Toggle quote state
                         inQuotes = !inQuotes;
                     }
                 } else if (char === ',' && !inQuotes) {
-                    // Field separator
                     result.push(current.trim());
                     current = '';
                 } else {
@@ -1234,10 +964,7 @@
                 i++;
             }
             
-            // Add the last field
             result.push(current.trim());
-            
-            // Clean up quoted fields
             return result.map(field => field.replace(/^"(.*)"$/, '$1').trim());
         }
 
@@ -1253,7 +980,6 @@
                 return;
             }
             
-            // Show first 10 contacts
             const contactsToShow = state.contacts.slice(0, 10);
             contactsToShow.forEach((contact, index) => {
                 const item = document.createElement('div');
@@ -1272,7 +998,6 @@
                 list.appendChild(item);
             });
 
-            // Show "more" indicator
             if (state.contacts.length > 10) {
                 const moreItem = document.createElement('div');
                 moreItem.className = 'contact-item';
@@ -1282,7 +1007,6 @@
         }
 
         function getContactName(contact) {
-            // Try different name field variations
             const firstName = contact.firstName || contact.first_name || contact['First Name'] || contact.fname || '';
             const lastName = contact.lastName || contact.last_name || contact['Last Name'] || contact.lname || '';
             const fullName = contact.name || contact.Name || contact.fullName || contact.full_name || '';
@@ -1294,7 +1018,6 @@
                 return fullName;
             }
             
-            // If no name, use email prefix
             const email = getContactEmail(contact);
             if (email) {
                 return email.split('@')[0];
@@ -1304,7 +1027,6 @@
         }
 
         function getContactEmail(contact) {
-            // Try different email field variations
             return contact.email || 
                    contact.Email || 
                    contact.EMAIL || 
@@ -1343,32 +1065,93 @@
             textarea.focus();
         }
 
-function loadDemoAccounts() {
-    state.emailAccounts = [
-        {
-            id: 1,
-            email: 'HindsonhotelAman@gmail.com',
-            provider: 'Mailtrap',
-            connected: true,
-            sentCount: 0,
-            maxSends: 100
+        function loadDemoAccounts() {
+            state.emailAccounts = [
+                {
+                    id: 1,
+                    email: '2003aman01.sharma@gmail.com',
+                    provider: 'Gmail Account 1',
+                    connected: true,
+                    sentCount: 0,
+                    maxSends: 40,
+                    active: true
+                },
+                {
+                    id: 2,
+                    email: 'oravi8937@gmail.com',
+                    provider: 'Gmail Account 2',
+                    connected: true,
+                    sentCount: 0,
+                    maxSends: 40,
+                    active: false
+                },
+                {
+                    id: 3,
+                    email: 'kavitathappar@gmail.com',
+                    provider: 'Gmail Account 3',
+                    connected: true,
+                    sentCount: 0,
+                    maxSends: 40,
+                    active: false
+                },
+                {
+                    id: 4,
+                    email: 'hitesh.singh08876@gmail.com',
+                    provider: 'Gmail Account 4',
+                    connected: true,
+                    sentCount: 0,
+                    maxSends: 40,
+                    active: false
+                },
+                {
+                    id: 5,
+                    email: 'virajgupta211@gmail.com',
+                    provider: 'Gmail Account 5',
+                    connected: true,
+                    sentCount: 0,
+                    maxSends: 40,
+                    active: false
+                }
+            ];
+            renderEmailAccounts();
         }
-    ];
-    renderEmailAccounts();
-          }
-        
 
         function renderEmailAccounts() {
             const container = document.getElementById('emailAccounts');
             container.innerHTML = '';
             
+            // Add account selector
+            const selectorDiv = document.createElement('div');
+            selectorDiv.className = 'account-selector';
+            selectorDiv.innerHTML = `
+                <div class="selector-title">📧 Account Selection & Auto-Rotation</div>
+                <div class="selector-buttons">
+                    ${state.emailAccounts.map(account => `
+                        <button class="btn btn-small ${account.active ? 'btn-success' : 'btn-secondary'}" 
+                                onclick="setActiveAccount(${account.id})"
+                                style="font-size: 12px;">
+                            ${account.active ? '🟢' : '⚪'} Account ${account.id}
+                        </button>
+                    `).join('')}
+                </div>
+                <div class="active-info">
+                    <strong>🎯 Primary Account:</strong> ${state.emailAccounts.find(a => a.active)?.email || 'None'}<br>
+                    <strong>🔄 Auto-Rotation:</strong> Every 40 emails per account<br>
+                    <strong>⚡ Total Capacity:</strong> ${state.emailAccounts.length * 40} emails/hour
+                </div>
+            `;
+            container.appendChild(selectorDiv);
+            
+            // Add individual account cards
             state.emailAccounts.forEach(account => {
                 const accountDiv = document.createElement('div');
-                accountDiv.className = `email-account ${account.connected ? 'connected' : 'disconnected'}`;
+                accountDiv.className = `email-account ${account.connected ? 'connected' : 'disconnected'} ${account.active ? 'active-account' : ''}`;
                 accountDiv.innerHTML = `
                     <div class="account-header">
                         <div>
-                            <div class="account-email">${account.email}</div>
+                            <div class="account-email">
+                                ${account.active ? '🟢' : '⚪'} ${account.email}
+                            </div>
                             <div class="account-provider">${account.provider}</div>
                         </div>
                         <div class="status-badge ${account.connected ? 'status-connected' : 'status-disconnected'}">
@@ -1376,17 +1159,35 @@ function loadDemoAccounts() {
                         </div>
                     </div>
                     <div class="account-actions">
+                        <button class="btn btn-small ${account.active ? 'btn-success' : 'btn-secondary'}" 
+                                onclick="setActiveAccount(${account.id})">
+                            ${account.active ? '🟢 Primary' : '⚪ Set Primary'}
+                        </button>
                         <button class="btn btn-small ${account.connected ? 'btn-danger' : 'btn-success'}" 
                                 onclick="toggleConnection(${account.id})">
                             ${account.connected ? 'Disconnect' : 'Connect'}
                         </button>
-                        <button class="btn btn-small btn-danger" onclick="removeAccount(${account.id})">
-                            🗑️ Remove
-                        </button>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        📊 Sent: ${account.sentCount}/${account.maxSends} | 🕒 Limit: ${account.maxSends}/hour
                     </div>
                 `;
                 container.appendChild(accountDiv);
             });
+        }
+
+        function setActiveAccount(accountId) {
+            state.emailAccounts.forEach(account => {
+                account.active = false;
+            });
+            
+            const selectedAccount = state.emailAccounts.find(a => a.id === accountId);
+            if (selectedAccount) {
+                selectedAccount.active = true;
+                log(`🎯 Primary account set to: ${selectedAccount.email}`, 'info');
+            }
+            
+            renderEmailAccounts();
         }
 
         function toggleConnection(accountId) {
@@ -1398,167 +1199,15 @@ function loadDemoAccounts() {
             }
         }
 
-        function removeAccount(accountId) {
-            if (confirm('Are you sure you want to remove this email account?')) {
-                state.emailAccounts = state.emailAccounts.filter(a => a.id !== accountId);
-                renderEmailAccounts();
-                log('Email account removed', 'info');
-            }
-        }
-
-        // Modal functions
-        function showEmailModal() {
-            document.getElementById('emailModal').style.display = 'block';
-            document.getElementById('providerSelection').style.display = 'block';
-            document.getElementById('accountForm').style.display = 'none';
-        }
-
-        function hideEmailModal() {
-            document.getElementById('emailModal').style.display = 'none';
-            resetModalForm();
-        }
-
-        function resetModalForm() {
-            document.getElementById('accountEmail').value = '';
-            document.getElementById('accountPassword').value = '';
-            document.getElementById('smtpServer').value = '';
-            document.getElementById('smtpPort').value = '587';
-            document.querySelectorAll('.provider-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-        }
-
-        function selectProvider(provider) {
-            document.querySelectorAll('.provider-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            document.querySelector(`[data-provider="${provider}"]`).classList.add('selected');
-            
-            document.getElementById('providerSelection').style.display = 'none';
-            document.getElementById('accountForm').style.display = 'block';
-            
-            setupProviderConfig(provider);
-        }
-
-        function setupProviderConfig(provider) {
-            const smtpSettings = document.getElementById('smtpSettings');
-            const instructions = document.getElementById('instructionContent');
-            
-            if (provider === 'gmail') {
-                smtpSettings.style.display = 'none';
-                document.getElementById('smtpServer').value = 'smtp.gmail.com';
-                document.getElementById('smtpPort').value = '587';
-                instructions.innerHTML = `
-                    <strong>Gmail Setup:</strong><br>
-                    1. Enable 2-Factor Authentication<br>
-                    2. Go to Google Account → Security → App passwords<br>
-                    3. Generate app password for "Mail"<br>
-                    4. Use your Gmail address and app password<br>
-                    5. SMTP: smtp.gmail.com, Port: 587
-                `;
-            } else if (provider === 'outlook') {
-                smtpSettings.style.display = 'none';
-                document.getElementById('smtpServer').value = 'smtp-mail.outlook.com';
-                document.getElementById('smtpPort').value = '587';
-                instructions.innerHTML = `
-                    <strong>Outlook Setup:</strong><br>
-                    1. Sign in to Microsoft account<br>
-                    2. Go to Security → Advanced security options<br>
-                    3. Create app password for email<br>
-                    4. Use Outlook email and app password<br>
-                    5. SMTP: smtp-mail.outlook.com, Port: 587
-                `;
-            } else if (provider === 'smtp') {
-                smtpSettings.style.display = 'block';
-                instructions.innerHTML = `
-                    <strong>Custom SMTP Setup:</strong><br>
-                    1. Get SMTP settings from your email provider<br>
-                    2. Common ports: 587 (TLS) or 465 (SSL)<br>
-                    3. Enter your email credentials<br>
-                    4. Test connection before saving
-                `;
-            }
-        }
-
-        async function testConnection() {
-            const email = document.getElementById('accountEmail').value;
-            const password = document.getElementById('accountPassword').value;
-            const host = document.getElementById('smtpServer').value;
-            const port = document.getElementById('smtpPort').value;
-            const security = document.getElementById('smtpSecurity').value;
-            
-            if (!email || !password) {
-                log('Please enter email and password', 'error');
-                return;
-            }
-            
-            try {
-                log('🔗 Testing connection via API...', 'info');
-                document.getElementById('testConnection').disabled = true;
-                
-                const result = await emailAPI.testConnection({
-                    email,
-                    password,
-                    host,
-                    port,
-                    security
-                });
-
-                if (result.success) {
-                    log('✅ Connection successful!', 'success');
-                    document.getElementById('saveAccount').disabled = false;
-                }
-
-            } catch (error) {
-                log(`❌ Connection failed: ${error.message}`, 'error');
-                document.getElementById('saveAccount').disabled = true;
-            } finally {
-                document.getElementById('testConnection').disabled = false;
-            }
-        }
-
-        function saveEmailAccount() {
-            const email = document.getElementById('accountEmail').value;
-            const password = document.getElementById('accountPassword').value;
-            const server = document.getElementById('smtpServer').value;
-            const port = document.getElementById('smtpPort').value;
-            
-            if (!email || !password) {
-                log('Please fill in all required fields', 'error');
-                return;
-            }
-            
-            const newAccount = {
-                id: state.emailAccounts.length + 1,
-                email: email,
-                provider: server.includes('gmail') ? 'Gmail' : server.includes('outlook') ? 'Outlook' : 'SMTP',
-                connected: true,
-                sentCount: 0,
-                maxSends: 100,
-                credentials: {
-                    host: server,
-                    port: port,
-                    password: password
-                }
-            };
-            
-            state.emailAccounts.push(newAccount);
-            renderEmailAccounts();
-            hideEmailModal();
-            log(`✅ Email account added: ${email}`, 'success');
-        }
-
-        // Campaign functions
         async function startCampaign() {
             if (state.contacts.length === 0) {
                 log('Please upload contacts first', 'error');
                 return;
             }
             
-            const connectedAccounts = state.emailAccounts.filter(a => a.connected);
-            if (connectedAccounts.length === 0) {
-                log('Please connect at least one email account', 'error');
+            const activeAccount = state.emailAccounts.find(a => a.active);
+            if (!activeAccount) {
+                log('Please select a primary email account', 'error');
                 return;
             }
             
@@ -1573,6 +1222,9 @@ function loadDemoAccounts() {
             
             try {
                 log(`🚀 Starting campaign: ${campaignName}`, 'info');
+                log(`🎯 Primary account: ${activeAccount.email}`, 'info');
+                log(`📊 Total contacts: ${state.contacts.length}`, 'info');
+                log(`🔄 Auto-rotation: Every 40 emails across ${state.emailAccounts.length} accounts`, 'info');
                 document.getElementById('startCampaign').disabled = true;
                 
                 const bulkData = {
@@ -1581,7 +1233,7 @@ function loadDemoAccounts() {
                         subject: subject,
                         content: content
                     },
-                    fromAccount: connectedAccounts[0],
+                    selectedAccount: activeAccount.id,
                     campaignId: `campaign_${Date.now()}`,
                     batchSize: 5,
                     delayBetweenBatches: 2000
@@ -1591,7 +1243,16 @@ function loadDemoAccounts() {
                 
                 if (result.success) {
                     log(`✅ Campaign completed!`, 'success');
+                    log(`🎯 Primary account: ${result.results.usedAccount}`, 'info');
                     log(`📊 Results: ${result.results.sent} sent, ${result.results.failed} failed`, 'info');
+                    
+                    // Show account switches
+                    if (result.results.accountSwitches && result.results.accountSwitches.length > 0) {
+                        log(`🔄 Account switches: ${result.results.accountSwitches.length}`, 'info');
+                        result.results.accountSwitches.forEach((switchInfo, index) => {
+                            log(`   📧 Switch ${index + 1}: ${switchInfo.newAccount} (after email ${switchInfo.switchAt})`, 'info');
+                        });
+                    }
                     
                     // Update stats
                     state.stats.totalSent = result.results.sent;
@@ -1606,9 +1267,12 @@ function loadDemoAccounts() {
                     // Show errors if any
                     if (result.results.errors.length > 0) {
                         log(`❌ Failed emails: ${result.results.errors.length}`, 'error');
-                        result.results.errors.forEach(error => {
+                        result.results.errors.slice(0, 5).forEach(error => {
                             log(`   • ${error.email}: ${error.error}`, 'error');
                         });
+                        if (result.results.errors.length > 5) {
+                            log(`   ... and ${result.results.errors.length - 5} more errors`, 'error');
+                        }
                     }
                 }
 
@@ -1623,9 +1287,9 @@ function loadDemoAccounts() {
             const testEmail = prompt('Enter test email address:');
             if (!testEmail) return;
             
-            const connectedAccounts = state.emailAccounts.filter(a => a.connected);
-            if (connectedAccounts.length === 0) {
-                log('No connected email accounts available', 'error');
+            const activeAccount = state.emailAccounts.find(a => a.active);
+            if (!activeAccount) {
+                log('No active email account available', 'error');
                 return;
             }
             
@@ -1639,7 +1303,7 @@ function loadDemoAccounts() {
                     to: testEmail,
                     subject: subject,
                     content: content,
-                    fromAccount: connectedAccounts[0],
+                    fromAccount: activeAccount,
                     isHtml: true
                 });
 
@@ -1703,7 +1367,6 @@ function loadDemoAccounts() {
                 timestamp: new Date().toISOString()
             };
             
-            // Save to localStorage for now
             try {
                 localStorage.setItem(`template_${Date.now()}`, JSON.stringify(template));
                 log(`💾 Template "${templateName}" saved successfully`, 'success');
@@ -1745,7 +1408,6 @@ Lisa,Garcia,lisa.garcia@example.com,E-commerce Plus,555-0135,Marketing Lead`;
                 personalized = personalized.replace(regex, contact[key] || '');
             });
             
-            // Remove any remaining unreplaced merge fields
             personalized = personalized.replace(/{{[^}]*}}/g, '');
             
             return personalized;
@@ -1767,7 +1429,6 @@ Lisa,Garcia,lisa.garcia@example.com,E-commerce Plus,555-0135,Marketing Lead`;
             logArea.appendChild(entry);
             logArea.scrollTop = logArea.scrollHeight;
             
-            // Keep only last 100 log entries
             const entries = logArea.querySelectorAll('.log-entry');
             if (entries.length > 100) {
                 entries[0].remove();
@@ -1783,17 +1444,8 @@ Lisa,Garcia,lisa.garcia@example.com,E-commerce Plus,555-0135,Marketing Lead`;
         }
 
         // Make functions globally available
+        window.setActiveAccount = setActiveAccount;
         window.toggleConnection = toggleConnection;
-        window.removeAccount = removeAccount;
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('emailModal');
-            if (event.target === modal) {
-                hideEmailModal();
-            }
-        }
     </script>
 </body>
 </html>
-          

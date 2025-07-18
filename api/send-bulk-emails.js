@@ -11,14 +11,69 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { contacts, template } = req.body;
+    const { contacts, template, selectedAccount } = req.body;
 
-    // Direct Gmail Configuration
+    // 5 Gmail accounts configuration
+    const emailAccounts = [
+      {
+        id: 1,
+        name: 'Account 1',
+        email: '2003aman01.sharma@gmail.com',
+        password: 'phszxjngntaqqncj',
+        active: true
+      },
+      {
+        id: 2,
+        name: 'Account 2',
+        email: 'oravi8937@gmail.com',
+        password: 'vvqxkbraclqzclgu',
+        active: false
+      },
+      {
+        id: 3,
+        name: 'Account 3',
+        email: 'kavitathappar@gmail.com',
+        password: 'smgqmkpskbvhgzpb',
+        active: false
+      },
+      {
+        id: 4,
+        name: 'Account 4',
+        email: 'hitesh.singh08876@gmail.com',
+        password: 'fsblmovdsuawhedw',
+        active: false
+      },
+      {
+        id: 5,
+        name: 'Account 5',
+        email: 'virajgupta211@gmail.com',
+        password: 'xqeocvxkpvasefcy',
+        active: false
+      }
+    ];
+
+    // Select account based on frontend selection or use first active
+    let currentAccount;
+    if (selectedAccount) {
+      currentAccount = emailAccounts.find(acc => acc.id === selectedAccount);
+    } else {
+      currentAccount = emailAccounts.find(acc => acc.active);
+    }
+
+    if (!currentAccount) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No active email account found' 
+      });
+    }
+
+    console.log(`🚀 Using account: ${currentAccount.email}`);
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: '2003aman01.sharma@gmail.com',
-        pass: 'phszxjngntaqqncj'
+        user: currentAccount.email,
+        pass: currentAccount.password
       }
     });
 
@@ -26,13 +81,47 @@ module.exports = async function handler(req, res) {
       total: contacts.length,
       sent: 0,
       failed: 0,
-      errors: []
+      errors: [],
+      usedAccount: currentAccount.email,
+      accountSwitches: []
     };
+
+    // Auto-rotation settings
+    const emailsPerAccount = 40; // Gmail safe limit per hour
+    let emailsSentFromCurrentAccount = 0;
+    let currentAccountIndex = emailAccounts.findIndex(acc => acc.id === currentAccount.id);
 
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
       
       try {
+        // Auto-switch account if limit reached
+        if (emailsSentFromCurrentAccount >= emailsPerAccount && emailAccounts.length > 1) {
+          console.log(`📧 Switching account after ${emailsSentFromCurrentAccount} emails`);
+          
+          // Find next available account
+          currentAccountIndex = (currentAccountIndex + 1) % emailAccounts.length;
+          currentAccount = emailAccounts[currentAccountIndex];
+          emailsSentFromCurrentAccount = 0;
+          
+          // Create new transporter for new account
+          const newTransporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: currentAccount.email,
+              pass: currentAccount.password
+            }
+          });
+          
+          results.accountSwitches.push({
+            switchAt: i,
+            newAccount: currentAccount.email
+          });
+          
+          console.log(`🔄 Switched to: ${currentAccount.email}`);
+        }
+
+        // Personalize email content
         let personalizedSubject = template.subject;
         let personalizedContent = template.content;
         
@@ -42,24 +131,29 @@ module.exports = async function handler(req, res) {
           personalizedContent = personalizedContent.replace(regex, contact[key] || '');
         });
 
+        // Send email
         await transporter.sendMail({
-          from: '2003aman01.sharma@gmail.com',
+          from: currentAccount.email,
           to: contact.email,
           subject: personalizedSubject,
           html: personalizedContent
         });
 
         results.sent++;
-        console.log(`✅ Email sent to ${contact.email}`);
+        emailsSentFromCurrentAccount++;
+        console.log(`✅ Email ${i + 1}/${contacts.length} sent to ${contact.email} from ${currentAccount.email}`);
+        
+        // Delay between emails (1 second)
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
         results.failed++;
         results.errors.push({
           email: contact.email || 'unknown',
-          error: error.message
+          error: error.message,
+          account: currentAccount.email
         });
-        console.log(`❌ Failed: ${contact.email}`);
+        console.log(`❌ Failed: ${contact.email} - ${error.message}`);
       }
     }
 
@@ -71,6 +165,7 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (error) {
+    console.error('Bulk email error:', error);
     return res.status(500).json({ 
       success: false, 
       error: error.message
