@@ -49,7 +49,30 @@ module.exports = async function handler(req, res) {
         email: 'virajgupta211@gmail.com',
         password: 'xqeocvxkpvasefcy',
         active: false
+      },
+      {
+        id: 6,
+        name: 'Account 6',
+        email: 'mirakhan9880@gmail.com',
+        password: 'cnkovpqzebmcirja',
+        active: false
+      },
+      {
+        id: 7,
+        name: 'Account 7',
+        email: 'amanfrommywall@gmail.com',
+        password: 'yiboyxsjzjplptbb',
+        active: false
+
+      },
+      {
+        id: 8,
+        name: 'Account 8',
+        email: 'fardeenkhandigital0@gmail.com',
+        password: 'iciborahoifdhuzf',
+        active: false
       }
+
     ];
 
     // Select account based on frontend selection or use first active
