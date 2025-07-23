@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   try {
     const { contacts, template, selectedAccount } = req.body;
 
-    // 5 Gmail accounts configuration
+    // 8 Gmail accounts configuration
     const emailAccounts = [
       {
         id: 1,
@@ -63,7 +63,6 @@ module.exports = async function handler(req, res) {
         email: 'amanfrommywall@gmail.com',
         password: 'yiboyxsjzjplptbb',
         active: false
-
       },
       {
         id: 8,
@@ -72,7 +71,6 @@ module.exports = async function handler(req, res) {
         password: 'iciborahoifdhuzf',
         active: false
       }
-
     ];
 
     // Select account based on frontend selection or use first active
@@ -154,12 +152,15 @@ module.exports = async function handler(req, res) {
           personalizedContent = personalizedContent.replace(regex, contact[key] || '');
         });
 
+        // ADDED: Convert text to HTML with preserved spacing
+        const htmlContent = convertTextToHTML(personalizedContent);
+
         // Send email
         await transporter.sendMail({
           from: currentAccount.email,
           to: contact.email,
           subject: personalizedSubject,
-          html: personalizedContent
+          html: htmlContent  // Use HTML with preserved formatting
         });
 
         results.sent++;
@@ -195,3 +196,19 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+// ADDED: Function to convert text to HTML with preserved spacing
+function convertTextToHTML(text) {
+  if (!text) return '';
+  
+  return text
+    // Convert line breaks to <br> tags
+    .replace(/\r?\n/g, '<br>')
+    // Convert multiple spaces to &nbsp; to preserve spacing
+    .replace(/  +/g, function(spaces) {
+      return '&nbsp;'.repeat(spaces.length);
+    })
+    // Wrap in a div with proper CSS for spacing preservation
+    .replace(/^/, '<div style="white-space: pre-wrap; font-family: Arial, sans-serif; line-height: 1.6; color: #333;">')
+    .replace(/$/, '</div>');
+}
