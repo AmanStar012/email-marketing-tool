@@ -147,7 +147,7 @@ module.exports = async function handler(req, res) {
         email: 'singhzorawar513@gmail.com',
         password: 'gtduzranvqwcgzgc',
         active: false
-      },
+      }
     ];
 
     // Select account based on frontend selection or use first active
