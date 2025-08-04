@@ -18,8 +18,8 @@ module.exports = async function handler(req, res) {
       {
         id: 1,
         name: 'Account 1',
-        email: '2003aman01.sharma@gmail.com',
-        password: 'phszxjngntaqqncj',
+        email: 'lalit.singh691w@gmail.com',
+        password: 'crrdjxjnsmpwbgny',
         active: true
       },
       {
