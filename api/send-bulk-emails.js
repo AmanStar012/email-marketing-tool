@@ -74,76 +74,13 @@ module.exports = async function handler(req, res) {
       {
         id: 9,
         name: 'Account 9',
-        email: 'kamaltalent228@gmail.com',
-        password: 'swgzyfobchrleqht',
-        active: false
-      },
-       {
-        id: 10,
-        name: 'Account 10',
-        email: 'oswin3430@gmail.com',
-        password: 'dsajwopendzjmcse',
-        active: false
-      },
-        {
-        id: 11,
-        name: 'Account 11',
-        email: 'sukratimanager@gmail.com',
-        password: 'setxclurdyydgqbo',
-        active: false
-      },
-        {
-        id: 12,
-        name: 'Account 12',
-        email: 'vartikamanager@gmail.com',
-        password: 'uzvyhmtsfcoanhcn',
-        active: false
-      },
-     {
-        id: 13,
-        name: 'Account 13',
-        email: 'karthikmanager74@gmail.com',
-        password: 'lbjomjmgwrwaizmw',
-        active: false
-      },
-     {
-        id: 14,
-        name: 'Account 14',
-        email: 'akhiltalent@gmail.com',
-        password: 'aacyobrsqnyqphbi',
-        active: false
-      },
-     {
-        id: 15,
-        name: 'Account 15',
-        email: 'janhvitalent@gmail.com',
-        password: 'zqkxjdwzxswoyydc',
-        active: false
-      },
-     {
-        id: 16,
-        name: 'Account 16',
-        email: 'ananttalent568@gmail.com',
-        password: 'dtkttxahssxicmno',
-        active: false
-      },
-     {
-        id: 17,
-        name: 'Account 17',
-        email: 'ayushtalent575@gmail.com',
-        password: 'ecdoehudgvzjohgu',
-        active: false
-      },
-     {
-        id: 18,
-        name: 'Account 18',
         email: 'abhijeet04.grynow@gmail.com',
         password: 'fpxrvzqepfcvatcd',
         active: false
       },
       {
-        id: 19,
-        name: 'Account 19',
+        id: 10,
+        name: 'Account 10',
         email: 'singhzorawar513@gmail.com',
         password: 'gtduzranvqwcgzgc',
         active: false
