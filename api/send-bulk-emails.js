@@ -89,70 +89,70 @@ module.exports = async function handler(req, res) {
 id: 11,
 name: 'Account 11',
 email: 'aaanshi10@gmail.com',
-password: 'wzqydnbtlojrcpaf',
+password: 'wdntgnoeopbdslpl',
 active: false
 },
 {
 id: 12,
 name: 'Account 12',
 email: 'anshi271801@gmail.com',
-password: 'kqjvufxrdlmotbpi',
+password: 'dofqevoypcwedyac',
 active: false
 },
 {
 id: 13,
 name: 'Account 13',
 email: 'dmalvika301@gmail.com',
-password: 'mxtlqzvprhoibcje',
+password: 'tsboiaiwyoyxrepc',
 active: false
 },
 {
 id: 14,
 name: 'Account 14',
 email: 'kriitiii3030@gmail.com',
-password: 'yzdntplqfmxojrva',
+password: 'zxpxmihhuwjdkzhk',
 active: false
 },
 {
 id: 15,
 name: 'Account 15',
 email: 'kunal789arora@gmail.com',
-password: 'hvqjmzrtalipcxoe',
+password: 'qkauojxcdgtdunud',
 active: false
 },
 {
 id: 16,
 name: 'Account 16',
 email: 'nayub.malik.grynow@gmail.com',
-password: 'rctqvplxojmizdah',
+password: 'aaflymyvpvojiral',
 active: false
 },
 {
 id: 17,
 name: 'Account 17',
 email: 'workwithahad2311@gmail.com',
-password: 'plqvxrjmtzohcadi',
+password: 'yehproowlzszvrss',
 active: false
 },
 {
 id: 18,
 name: 'Account 18',
 email: 'sakshi031singh@gmail.com',
-password: 'jvqltmxrzpoahcdi',
+password: 'lbrqsjwubszrzolv',
 active: false
 },
 {
 id: 19,
 name: 'Account 19',
 email: 'khandelwalsanya3@gmail.com',
-password: 'qvztlmxorjphcadi',
+password: 'suflbridlirfcaeb',
 active: false
 },
 {
 id: 20,
 name: 'Account 20',
 email: 'sharma.pradeep00978@gmail.com',
-password: 'tzqvlmxrojphcadi',
+password: 'zfopymcqssrmmqby',
 active: false
 }
 
