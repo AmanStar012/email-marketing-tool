@@ -155,8 +155,7 @@ email: 'sharma.pradeep00978@gmail.com',
 password: 'zfopymcqssrmmqby',
 active: false
 }
-
-    ];
+];
 
     // Select account based on frontend selection or use first active
     let currentAccount;
