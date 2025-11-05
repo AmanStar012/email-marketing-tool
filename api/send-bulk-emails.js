@@ -88,70 +88,70 @@ module.exports = async function handler(req, res) {
       {
 id: 11,
 name: 'Account 11',
-email: '[aaanshi10@gmail.com](mailto:aaanshi10@gmail.com)',
+email: 'aaanshi10@gmail.com',
 password: 'wzqydnbtlojrcpaf',
 active: false
 },
 {
 id: 12,
 name: 'Account 12',
-email: '[anshi271801@gmail.com](mailto:anshi271801@gmail.com)',
+email: 'anshi271801@gmail.com',
 password: 'kqjvufxrdlmotbpi',
 active: false
 },
 {
 id: 13,
 name: 'Account 13',
-email: '[dmalvika301@gmail.com](mailto:dmalvika301@gmail.com)',
+email: 'dmalvika301@gmail.com',
 password: 'mxtlqzvprhoibcje',
 active: false
 },
 {
 id: 14,
 name: 'Account 14',
-email: '[kriitiii3030@gmail.com](mailto:kriitiii3030@gmail.com)',
+email: 'kriitiii3030@gmail.com',
 password: 'yzdntplqfmxojrva',
 active: false
 },
 {
 id: 15,
 name: 'Account 15',
-email: '[kunal789arora@gmail.com](mailto:kunal789arora@gmail.com)',
+email: 'kunal789arora@gmail.com',
 password: 'hvqjmzrtalipcxoe',
 active: false
 },
 {
 id: 16,
 name: 'Account 16',
-email: '[nayub.malik.grynow@gmail.com](mailto:nayub.malik.grynow@gmail.com)',
+email: 'nayub.malik.grynow@gmail.com',
 password: 'rctqvplxojmizdah',
 active: false
 },
 {
 id: 17,
 name: 'Account 17',
-email: '[workwithahad2311@gmail.com](mailto:workwithahad2311@gmail.com)',
+email: 'workwithahad2311@gmail.com',
 password: 'plqvxrjmtzohcadi',
 active: false
 },
 {
 id: 18,
 name: 'Account 18',
-email: '[sakshi031singh@gmail.com](mailto:sakshi031singh@gmail.com)',
+email: 'sakshi031singh@gmail.com',
 password: 'jvqltmxrzpoahcdi',
 active: false
 },
 {
 id: 19,
 name: 'Account 19',
-email: '[khandelwalsanya3@gmail.com](mailto:khandelwalsanya3@gmail.com)',
+email: 'khandelwalsanya3@gmail.com',
 password: 'qvztlmxorjphcadi',
 active: false
 },
 {
 id: 20,
 name: 'Account 20',
-email: '[sharma.pradeep00978@gmail.com](mailto:sharma.pradeep00978@gmail.com)',
+email: 'sharma.pradeep00978@gmail.com',
 password: 'tzqvlmxrojphcadi',
 active: false
 }
