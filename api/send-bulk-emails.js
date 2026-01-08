@@ -154,7 +154,112 @@ name: 'Account 20',
 email: 'sharma.pradeep00978@gmail.com',
 password: 'zfopymcqssrmmqby',
 active: false
-}
+},
+{
+id: 21,
+name: 'Account 21',
+email: 'sanjaytalentmanager@gmail.com',
+password: 'bwoekhfrcmkxcyqq',
+active: false
+},
+{
+id: 22,
+name: 'Account 22',
+email: 'mukultalentmanager@gmail.com',
+password: 'xjpgbwetasfxoevz',
+active: false
+},
+{
+id: 23,
+name: 'Account 23',
+email: 'albaabtalentmanager@gmail.com',
+password: 'ekankglzkqxjrcgk',
+active: false
+},
+{
+id: 24,
+name: 'Account 24',
+email: 'haidertalentmanager@gmail.com',
+password: 'hhjrdircmjvgvjmj',
+active: false
+},
+{
+id: 25,
+name: 'Account 25',
+email: 'gonikatalentmanager@gmail.com',
+password: 'iayiyikuozwsexqm',
+active: false
+},
+{
+id: 26,
+name: 'Account 26',
+email: 'muskantalentmanager@gmail.com',
+password: 'bvwhuicgikwkxzpg',
+active: false
+},
+{
+id: 27,
+name: 'Account 27',
+email: 'nidatalentmanager@gmail.com',
+password: 'njsfqibmlwcxfbyk',
+active: false
+},
+{
+id: 28,
+name: 'Account 28',
+email: 'arshadtalentmanager@gmail.com',
+password: 'ylfyjzfrhofwkuoj',
+active: false
+},
+{
+id: 29,
+name: 'Account 29',
+email: 'divyanshutalentmanager@gmail.com',
+password: 'xnmbulytpsiofnwn',
+active: false
+},
+{
+id: 30,
+name: 'Account 30',
+email: 'nilamtalentmanager@gmail.com',
+password: 'bdkscfgtlgxhvvmw',
+active: false
+},
+{
+id: 31,
+name: 'Account 31',
+email: 'faiztalentmanager@gmail.com',
+password: 'nojkuxcnywydbdim',
+active: false
+},
+{
+id: 32,
+name: 'Account 32',
+email: 'mayanktalentmanager@gmail.com',
+password: 'fyqhfnafbofaoapw',
+active: false
+},
+{
+id: 33,
+name: 'Account 33',
+email: 'krishnatalentmanager@gmail.com',
+password: 'uvdpmxwkwsmtggzr',
+active: false
+},
+{
+id: 34,
+name: 'Account 34',
+email: 'ojastalentmanager@gmail.com',
+password: 'pihrnsbigntorpwf',
+active: false
+},
+{      
+id: 35,
+name: 'Account 35',
+email: 'haiderr12124@gmail.com',
+password: 'zfxpjdjospolazoy',
+active: false
+} 
 ];
 
     // Select account based on frontend selection or use first active
