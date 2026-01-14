@@ -1,28 +1,21 @@
 {
   "version": 2,
   "functions": {
-    "api/send-email.js": {
-      "maxDuration": 30,
-      "memory": 1024
-    },
-    "api/send-bulk-emails.js": {
-      "maxDuration": 300,
-      "memory": 1024
-    },
-    "api/test-connection.js": {
-      "maxDuration": 15,
-      "memory": 512
-    }
+    "api/send-email.js": { "maxDuration": 30, "memory": 1024 },
+    "api/send-bulk-emails.js": { "maxDuration": 300, "memory": 1024 },
+    "api/test-connection.js": { "maxDuration": 15, "memory": 512 },
+
+    "api/accounts.js": { "maxDuration": 15, "memory": 512 },
+    "api/accounts-set-status.js": { "maxDuration": 15, "memory": 512 },
+
+    "api/auto-start.js": { "maxDuration": 30, "memory": 1024 },
+    "api/auto-stop.js": { "maxDuration": 15, "memory": 512 },
+    "api/auto-status.js": { "maxDuration": 15, "memory": 512 },
+    "api/auto-tick.js": { "maxDuration": 300, "memory": 1024 }
   },
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
-    }
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/public/$1" }
   ],
   "env": {
     "NODE_ENV": "production"

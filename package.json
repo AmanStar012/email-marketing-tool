@@ -4,19 +4,26 @@
   "description": "Advanced email marketing tool with Vercel + Nodemailer",
   "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "dev": "node -e \"console.log('Use: npx vercel dev')\""
   },
   "dependencies": {
-    "nodemailer": "^6.9.7",
-    "express-rate-limit": "^7.1.5",
+    "@vercel/kv": "^2.0.0",
     "cors": "^2.8.5",
-    "helmet": "^7.1.0"
+    "dotenv": "^17.2.3",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "nodemailer": "^6.9.7",
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "vercel": "^32.7.2"
   },
-  "keywords": ["email", "marketing", "nodemailer", "vercel"],
+  "keywords": [
+    "email",
+    "marketing",
+    "nodemailer",
+    "vercel"
+  ],
   "author": "Your Name",
   "license": "MIT"
 }
