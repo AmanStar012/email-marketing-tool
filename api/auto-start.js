@@ -1,4 +1,4 @@
-const { cors, redisGet, redisSet } = require("./_shared");
+const { cors, redisSet } = require("./_shared");
 
 module.exports = async function handler(req, res) {
   cors(res);
@@ -16,8 +16,8 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, error: "template.subject + template.content are required" });
     }
 
-    // if a campaign is already active, keep it but allow overwrite by creating new id
     const campaignId = `c_${Date.now()}`;
+    const now = Date.now();
 
     const campaign = {
       id: campaignId,
@@ -27,16 +27,40 @@ module.exports = async function handler(req, res) {
       contacts,
       cursor: 0,
       total: contacts.length,
-
       emailsPerAccountPerHour: 40,
       perEmailDelayMs: 1000,
-
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      createdAt: now,
+      updatedAt: now
     };
 
+    // Core campaign
     await redisSet(`auto:campaign:${campaignId}`, campaign);
+
+    // Pointers
     await redisSet("auto:campaign:active", campaignId);
+    await redisSet("auto:campaign:last", campaignId);
+
+    // Stats init
+    await redisSet(`auto:campaign:${campaignId}:stats`, {
+      campaignId,
+      totalSent: 0,
+      totalFailed: 0,
+      byAccount: {}
+    });
+
+    // Live init
+    await redisSet(`auto:campaign:${campaignId}:live`, {
+      currentAccountId: null,
+      currentEmail: null,
+      currentSenderName: null,
+      state: "running",
+      updatedAt: now
+    });
+
+    // Events init
+    await redisSet(`auto:campaign:${campaignId}:events`, [
+      { ts: now, status: "campaign_started", campaignId, brandName, total: contacts.length }
+    ]);
 
     return res.status(200).json({ success: true, campaignId });
   } catch (e) {

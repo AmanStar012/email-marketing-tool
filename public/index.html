@@ -110,6 +110,20 @@
     }
     .auto-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .auto-status{font-size:13px;color:#444;margin-top:10px;background:#fff;border:1px solid #dee2e6;border-radius:8px;padding:10px}
+    .auto-panels{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+    .auto-panel{background:#fff;border:1px solid #e9ecef;border-radius:10px;padding:12px}
+    .auto-panel h4{font-size:14px;color:#2c3e50;margin-bottom:8px}
+    .mini{font-size:12px;color:#666}
+    .table-wrap{overflow:auto;border:1px solid #e9ecef;border-radius:10px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}
+    th{background:#f7f8fa;font-weight:700;color:#2c3e50}
+    tr:hover td{background:rgba(52,152,219,.04)}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill-green{background:#d4edda;color:#155724}
+    .pill-red{background:#f8d7da;color:#721c24}
+    .pill-blue{background:#dbeafe;color:#1e3a8a}
+    .pill-gray{background:#e5e7eb;color:#111827}
 
     @media (max-width:768px){
       .main-content{grid-template-columns:1fr;gap:20px;padding:20px}
@@ -123,7 +137,7 @@
   <div class="container">
     <div class="header">
       <h1>🚀 Email Marketing Pro</h1>
-      <p>Manual + Auto Hourly Campaign (Cron + KV)</p>
+      <p>Manual + Auto Hourly Campaign (GitHub Actions + Redis)</p>
       <div class="stats-grid">
         <div class="stat-card">
           <span class="stat-number" id="totalSent">0</span>
@@ -164,15 +178,17 @@
           </div>
           <div class="contacts-preview" id="contactsPreview" style="display:none;">
             <h3>📊 Contacts Preview</h3>
+            <div class="mini" id="csvCountLabel">CSV Emails: 0</div>
+            <div style="height:10px"></div>
             <div id="contactsList"></div>
           </div>
         </div>
 
-        <!-- Email Template -->
+        <!-- Email Template + Auto -->
         <div class="section">
           <div class="section-header">
             <div class="section-icon">2</div>
-            <div class="section-title">Email Template</div>
+            <div class="section-title">Email Template + Auto</div>
           </div>
 
           <div class="form-group">
@@ -203,19 +219,49 @@
           </div>
 
           <div class="auto-box">
-            <!-- ✅ ADDED: Secret input (saved in this browser) -->
-            <div class="form-group" style="margin-top:10px;margin-bottom:10px;">
-              <label class="form-label">Auto Secret (saved in this browser)</label>
-              <input type="password" class="form-control" id="autoSecretInput" placeholder="Enter your AUTO_SECRET">
-              <small style="display:block;margin-top:6px;color:#666;">This stays in your browser (localStorage).</small>
-            </div>
-
             <div class="auto-row">
               <button class="btn btn-success" id="autoStartBtn">⏱️ Start Auto Campaign</button>
               <button class="btn btn-danger" id="autoStopBtn">🛑 Stop Auto Campaign</button>
               <button class="btn btn-small btn-secondary" id="autoRefreshBtn">🔄 Refresh Auto Status</button>
             </div>
+
             <div class="auto-status" id="autoStatusBox">Auto Status: (loading...)</div>
+
+            <div class="auto-panels">
+              <div class="auto-panel">
+                <h4>📨 Current Sender (Live)</h4>
+                <div id="autoLiveBox" class="mini">—</div>
+              </div>
+
+              <div class="auto-panel">
+                <h4>📊 Per-Account Stats</h4>
+                <div class="table-wrap">
+                  <table id="autoStatsTable">
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th>Sender</th>
+                        <th>Sent</th>
+                        <th>Failed</th>
+                        <th>Last Sent</th>
+                      </tr>
+                    </thead>
+                    <tbody id="autoStatsBody">
+                      <tr><td colspan="5" class="mini">No data</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="mini" style="margin-top:8px" id="autoTotalsMini">—</div>
+              </div>
+
+              <div class="auto-panel">
+                <h4>🕒 Latest Send Events</h4>
+                <div class="log-area" id="autoEventsLog" style="max-height:220px;background:#111827">
+                  <div class="log-entry log-info">No events yet</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -276,24 +322,10 @@
   </div>
 
 <script>
-  // ✅ Secret helpers (stored only in browser localStorage)
-  function getAutoSecret() {
-    return localStorage.getItem("AUTO_SECRET") || "";
-  }
-  function setAutoSecret(secret) {
-    localStorage.setItem("AUTO_SECRET", secret || "");
-  }
-  function requireAutoSecretOrThrow() {
-    const s = getAutoSecret();
-    if (!s) throw new Error("AUTO_SECRET is missing. Enter it in the Auto Secret field.");
-    return s;
-  }
-
   // Global State
   const state = {
     contacts: [],
     emailAccounts: [],
-    currentCampaign: null,
     autoCampaignId: null,
     stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 }
   };
@@ -304,8 +336,7 @@
 
     async sendEmail(emailData) {
       const response = await fetch(`${this.baseURL}/api/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData)
       });
       const result = await response.json();
@@ -315,8 +346,7 @@
 
     async sendBulkEmails(bulkData) {
       const response = await fetch(`${this.baseURL}/api/send-bulk-emails`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bulkData)
       });
       const result = await response.json();
@@ -324,25 +354,16 @@
       return result;
     }
 
-    // ✅ PROTECTED endpoints (require x-auto-secret)
     async getAccounts() {
-      const secret = requireAutoSecretOrThrow();
-      const response = await fetch(`${this.baseURL}/api/accounts`, {
-        headers: { 'x-auto-secret': secret }
-      });
+      const response = await fetch(`${this.baseURL}/api/accounts`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to fetch accounts');
       return result.accounts;
     }
 
     async setAccountStatus(accountId, connected) {
-      const secret = requireAutoSecretOrThrow();
       const response = await fetch(`${this.baseURL}/api/accounts-set-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auto-secret': secret
-        },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, connected })
       });
       const result = await response.json();
@@ -351,13 +372,8 @@
     }
 
     async autoStart(payload) {
-      const secret = requireAutoSecretOrThrow();
       const response = await fetch(`${this.baseURL}/api/auto-start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auto-secret': secret
-        },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const result = await response.json();
@@ -366,21 +382,14 @@
     }
 
     async autoStop() {
-      const secret = requireAutoSecretOrThrow();
-      const response = await fetch(`${this.baseURL}/api/auto-stop`, {
-        method: 'POST',
-        headers: { 'x-auto-secret': secret }
-      });
+      const response = await fetch(`${this.baseURL}/api/auto-stop`, { method: 'POST' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to stop auto campaign');
       return result;
     }
 
     async autoStatus() {
-      const secret = requireAutoSecretOrThrow();
-      const response = await fetch(`${this.baseURL}/api/auto-status`, {
-        headers: { 'x-auto-secret': secret }
-      });
+      const response = await fetch(`${this.baseURL}/api/auto-status`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to fetch auto status');
       return result;
@@ -397,17 +406,16 @@
     setupEventListeners();
     initializeUploadZone();
     loadSavedTemplateFromLocalStorage();
-
-    // ✅ Load saved AUTO_SECRET into input (browser localStorage)
-    const savedSecret = getAutoSecret();
-    if (savedSecret) document.getElementById('autoSecretInput').value = savedSecret;
-
-    // Accounts and auto status will load only if secret exists
     loadAccountsFromBackend();
-    updateMergeFields([]); // will update after csv upload
+    updateMergeFields([]);
     updateStats();
     refreshAutoStatus();
     log('UI ready. Manual + Auto available.', 'info');
+
+    // light auto refresh (UI only) every 10 seconds
+    setInterval(() => {
+      refreshAutoStatus().catch(()=>{});
+    }, 10000);
   }
 
   function setupEventListeners() {
@@ -421,20 +429,9 @@
     document.getElementById('autoStopBtn').addEventListener('click', stopAutoCampaign);
     document.getElementById('autoRefreshBtn').addEventListener('click', refreshAutoStatus);
 
-    // Auto-save template fields
     ['brandName','subjectLine','emailContent','templateName'].forEach(id => {
       const el = document.getElementById(id);
       el.addEventListener('input', saveTemplateToLocalStorage);
-    });
-
-    // ✅ Save secret to localStorage as you type
-    const secretInput = document.getElementById("autoSecretInput");
-    secretInput.addEventListener("input", () => setAutoSecret(secretInput.value));
-
-    // ✅ When secret changes, reload accounts + auto status
-    secretInput.addEventListener("change", () => {
-      loadAccountsFromBackend();
-      refreshAutoStatus();
     });
   }
 
@@ -468,14 +465,7 @@
 
   async function loadAccountsFromBackend() {
     try {
-      // If secret not present, do not spam errors; show a helpful log.
-      if (!getAutoSecret()) {
-        log('Enter Auto Secret to load accounts + auto features.', 'warning');
-        return;
-      }
-
       const accounts = await emailAPI.getAccounts();
-      // pick first connected as active default
       state.emailAccounts = accounts.map((a, idx) => ({
         ...a,
         provider: `Gmail Account ${a.id}`,
@@ -511,7 +501,6 @@
         const values = parseCSVLine(line);
         const contact = {};
         headers.forEach((h, idx) => contact[h] = values[idx] || '');
-        // accept row if has any useful field
         const hasAny = Object.values(contact).some(v => String(v).trim() !== '');
         if (hasAny) state.contacts.push(contact);
       }
@@ -520,7 +509,8 @@
 
       displayContacts();
       updateMergeFields(headers);
-      updateStats();
+      document.getElementById('csvCountLabel').textContent = `CSV Emails: ${state.contacts.length}`;
+      updateStatsFromLocalCsvOnly();
       log(`✅ Loaded ${state.contacts.length} contacts`, 'success');
     } catch (e) {
       log(`CSV parse error: ${e.message}`, 'error');
@@ -571,8 +561,8 @@
       const email = getContactEmail(c);
       item.innerHTML = `
         <div>
-          <div class="contact-name">${name}</div>
-          <div class="contact-email">${email}</div>
+          <div class="contact-name">${escapeHtml(name)}</div>
+          <div class="contact-email">${escapeHtml(email)}</div>
         </div>
       `;
       list.appendChild(item);
@@ -611,7 +601,6 @@
     const container = document.getElementById('mergeFields');
     container.innerHTML = '';
 
-    // Always add brandName and senderName buttons
     ['brandName','senderName'].forEach(k => {
       const field = document.createElement('button');
       field.className = 'merge-field';
@@ -620,7 +609,6 @@
       container.appendChild(field);
     });
 
-    // Add CSV headers
     (headers || []).forEach(h => {
       const field = document.createElement('button');
       field.className = 'merge-field';
@@ -652,9 +640,9 @@
         <div class="account-header">
           <div>
             <div class="account-email">
-              ${account.active ? '🟢' : '⚪'} ${account.email}
+              ${account.active ? '🟢' : '⚪'} ${escapeHtml(account.email)}
             </div>
-            <div class="account-provider">Sender: <strong>${account.senderName}</strong></div>
+            <div class="account-provider">Sender: <strong>${escapeHtml(account.senderName || '')}</strong></div>
             ${account.lastError ? `<div class="account-provider" style="color:#b00020;">Last error: ${escapeHtml(account.lastError)}</div>` : ''}
           </div>
           <div class="status-badge ${account.connected ? 'status-connected' : 'status-disconnected'}">
@@ -703,7 +691,7 @@
     }
   }
 
-  // MANUAL Campaign (unchanged request shape)
+  // MANUAL Campaign (unchanged)
   async function startCampaignManual() {
     if (state.contacts.length === 0) return log('Upload contacts first', 'error');
     const activeAccount = state.emailAccounts.find(a => a.active);
@@ -711,13 +699,11 @@
 
     const subject = document.getElementById('subjectLine').value;
     const content = document.getElementById('emailContent').value;
-
     if (!subject || !content) return log('Fill subject and content', 'error');
 
     try {
       document.getElementById('startCampaign').disabled = true;
 
-      // NOTE: this calls your existing manual endpoint. We do not change it.
       const bulkData = {
         contacts: state.contacts.map(c => normalizeContactEmailKey(c)),
         template: { subject, content },
@@ -756,19 +742,12 @@
     if (!subject || !content) return log('Fill subject and body', 'error');
 
     try {
-      // Save locally (you asked: do not delete)
       saveTemplateToLocalStorage();
-
-      // Normalize contacts to have "email" key (helps backend)
       const normalizedContacts = state.contacts.map(c => normalizeContactEmailKey(c));
 
-      const payload = {
-        contacts: normalizedContacts,
-        brandName,
-        template: { subject, content }
-      };
-
+      const payload = { contacts: normalizedContacts, brandName, template: { subject, content } };
       const r = await emailAPI.autoStart(payload);
+
       state.autoCampaignId = r.campaignId;
       log(`⏱️ Auto campaign started: ${r.campaignId}`, 'success');
       await refreshAutoStatus();
@@ -787,34 +766,154 @@
     }
   }
 
+  // ✅ UPDATED: refreshAutoStatus reads campaign + live + stats + events
   async function refreshAutoStatus() {
+    const box = document.getElementById('autoStatusBox');
+    const liveBox = document.getElementById('autoLiveBox');
+    const statsBody = document.getElementById('autoStatsBody');
+    const totalsMini = document.getElementById('autoTotalsMini');
+    const eventsLog = document.getElementById('autoEventsLog');
+
     try {
-      if (!getAutoSecret()) {
-        document.getElementById('autoStatusBox').innerHTML =
-          `Auto Status: <strong>Secret required</strong><br><span style="color:#666;">Enter Auto Secret to view status.</span>`;
-        return;
-      }
-
       const s = await emailAPI.autoStatus();
-      const box = document.getElementById('autoStatusBox');
 
-      if (!s.activeId || !s.campaign) {
-        box.innerHTML = `Auto Status: <strong>None running</strong><br><span style="color:#666;">Cron will do nothing until you start.</span>`;
+      // No campaign at all
+      if (!s.campaign) {
+        box.innerHTML = `Auto Status: <strong>None</strong><br><span style="color:#666;">Start auto campaign to enable hourly sending.</span>`;
+        liveBox.textContent = "—";
+        statsBody.innerHTML = `<tr><td colspan="5" class="mini">No data</td></tr>`;
+        totalsMini.textContent = "—";
+        eventsLog.innerHTML = `<div class="log-entry log-info">No events yet</div>`;
+        // keep header stats from local csv
+        updateStatsFromLocalCsvOnly();
         return;
       }
 
       const c = s.campaign;
-      const percent = c.total ? Math.round((c.cursor / c.total) * 100) : 0;
+      const total = Number(c.total || 0);
+      const cursor = Number(c.cursor || 0);
+      const percent = Number(c.percent || (total ? Math.round((cursor/total)*100) : 0));
+
+      // Running / Completed should show
+      const statusPill = (c.status === "running")
+        ? `<span class="pill pill-green">RUNNING</span>`
+        : (c.status === "completed")
+          ? `<span class="pill pill-blue">COMPLETED</span>`
+          : `<span class="pill pill-gray">${escapeHtml(String(c.status||""))}</span>`;
+
       box.innerHTML = `
-        Auto Status: <strong>${c.status}</strong><br>
-        Campaign: <strong>${c.id}</strong><br>
+        Auto Status: ${statusPill}<br>
+        Campaign: <strong>${escapeHtml(c.id)}</strong><br>
         Brand: <strong>${escapeHtml(c.brandName || '')}</strong><br>
-        Progress: <strong>${c.cursor}/${c.total}</strong> (${percent}%)<br>
+        Progress: <strong>${cursor}/${total}</strong> (${percent}%)<br>
         Updated: ${new Date(c.updatedAt).toLocaleString()}
       `;
+
+      // progress bar
+      document.getElementById('progressFill').style.width = `${Math.min(100, Math.max(0, percent))}%`;
+
+      // LIVE sender
+      const live = s.live || null;
+      if (live && live.state === "sending" && live.currentEmail) {
+        liveBox.innerHTML = `
+          <div><span class="pill pill-green">SENDING NOW</span></div>
+          <div style="margin-top:8px"><strong>${escapeHtml(live.currentEmail)}</strong></div>
+          <div class="mini">Sender: ${escapeHtml(live.currentSenderName || "")}</div>
+          <div class="mini">Updated: ${new Date(live.updatedAt).toLocaleString()}</div>
+        `;
+      } else if (live && live.state === "completed") {
+        liveBox.innerHTML = `<span class="pill pill-blue">COMPLETED</span>`;
+      } else if (live && live.state) {
+        liveBox.innerHTML = `<span class="pill pill-gray">${escapeHtml(live.state)}</span>`;
+      } else {
+        liveBox.textContent = "—";
+      }
+
+      // STATS
+      const stats = s.stats || null;
+      let totalSent = 0, totalFailed = 0;
+      let byAccountRows = [];
+
+      if (stats) {
+        totalSent = Number(stats.totalSent || 0);
+        totalFailed = Number(stats.totalFailed || 0);
+
+        const by = stats.byAccount || {};
+        byAccountRows = Object.keys(by).map(id => {
+          const r = by[id] || {};
+          return {
+            id,
+            email: r.email || '',
+            senderName: r.senderName || '',
+            sent: Number(r.sent || 0),
+            failed: Number(r.failed || 0),
+            lastSentAt: Number(r.lastSentAt || 0)
+          };
+        }).sort((a,b) => b.sent - a.sent);
+      }
+
+      // render per-account
+      if (byAccountRows.length === 0) {
+        statsBody.innerHTML = `<tr><td colspan="5" class="mini">No data</td></tr>`;
+      } else {
+        statsBody.innerHTML = byAccountRows.map(r => `
+          <tr>
+            <td>${escapeHtml(r.email)} <span class="mini">(id ${escapeHtml(r.id)})</span></td>
+            <td>${escapeHtml(r.senderName)}</td>
+            <td><strong>${r.sent}</strong></td>
+            <td>${r.failed}</td>
+            <td>${r.lastSentAt ? new Date(r.lastSentAt).toLocaleString() : '—'}</td>
+          </tr>
+        `).join("");
+      }
+
+      totalsMini.textContent = `Total Sent: ${totalSent} | Total Failed: ${totalFailed} | CSV Total: ${total} | Remaining: ${Math.max(0, total - cursor)}`;
+
+      // EVENTS (latest 80)
+      const events = Array.isArray(s.events) ? s.events.slice(-80) : [];
+      if (events.length === 0) {
+        eventsLog.innerHTML = `<div class="log-entry log-info">No events yet</div>`;
+      } else {
+        eventsLog.innerHTML = events.map(ev => {
+          const ts = ev.ts ? new Date(ev.ts).toLocaleString() : '';
+          if (ev.status === "sent") {
+            return `<div class="log-entry log-success">[${escapeHtml(ts)}] ✅ SENT | from ${escapeHtml(ev.from||"")} → ${escapeHtml(ev.to||"")}</div>`;
+          }
+          if (ev.status === "failed") {
+            return `<div class="log-entry log-error">[${escapeHtml(ts)}] ❌ FAILED | from ${escapeHtml(ev.from||"")} → ${escapeHtml(ev.to||"")} | ${escapeHtml(ev.error||"")}</div>`;
+          }
+          if (ev.status === "campaign_completed") {
+            return `<div class="log-entry log-info">[${escapeHtml(ts)}] 🏁 CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId||"")})</div>`;
+          }
+          return `<div class="log-entry log-info">[${escapeHtml(ts)}] ${escapeHtml(JSON.stringify(ev))}</div>`;
+        }).join("");
+        eventsLog.scrollTop = eventsLog.scrollHeight;
+      }
+
+      // ✅ Update header stats using auto stats + campaign cursor
+      const inQueue = Math.max(0, total - cursor);
+      const successRate = (totalSent + totalFailed) > 0 ? Math.round((totalSent / (totalSent + totalFailed)) * 100) : 0;
+
+      state.stats.totalSent = totalSent;
+      state.stats.failed = totalFailed;
+      state.stats.inQueue = inQueue;
+      state.stats.successRate = successRate;
+      updateStats();
+
     } catch (e) {
-      document.getElementById('autoStatusBox').textContent = `Auto Status: error - ${e.message}`;
+      box.textContent = `Auto Status: error - ${e.message}`;
     }
+  }
+
+  // For times when no auto campaign exists, still show CSV total in queue
+  function updateStatsFromLocalCsvOnly() {
+    const csvTotal = state.contacts.length || 0;
+    state.stats.totalSent = 0;
+    state.stats.failed = 0;
+    state.stats.inQueue = csvTotal;
+    state.stats.successRate = 0;
+    updateStats();
+    document.getElementById('progressFill').style.width = '0%';
   }
 
   async function sendTestEmail() {
@@ -841,7 +940,6 @@
     const content = document.getElementById('emailContent').value;
 
     const sample = normalizeContactEmailKey(state.contacts[0]);
-    // For preview: use primary account senderName
     const active = state.emailAccounts.find(a => a.active) || state.emailAccounts[0];
     const vars = { ...sample, brandName, senderName: active?.senderName || '' };
 
