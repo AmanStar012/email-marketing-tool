@@ -1,5 +1,4 @@
-const { kv } = require("@vercel/kv");
-const { cors, loadAccountsConfig } = require("./_shared");
+const { cors, loadAccountsConfig, redisGet } = require("./_shared");
 
 module.exports = async function handler(req, res) {
   cors(res);
@@ -7,8 +6,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const accounts = loadAccountsConfig();
-    const runtime = (await kv.get("accounts:runtime")) || {};
-    // runtime: { "1": { connected:true, lastError:"" } }
+    const runtime = (await redisGet("accounts:runtime")) || {};
 
     const safe = accounts.map((a) => {
       const rt = runtime[String(a.id)] || {};

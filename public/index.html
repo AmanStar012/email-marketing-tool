@@ -203,6 +203,13 @@
           </div>
 
           <div class="auto-box">
+            <!-- ✅ ADDED: Secret input (saved in this browser) -->
+            <div class="form-group" style="margin-top:10px;margin-bottom:10px;">
+              <label class="form-label">Auto Secret (saved in this browser)</label>
+              <input type="password" class="form-control" id="autoSecretInput" placeholder="Enter your AUTO_SECRET">
+              <small style="display:block;margin-top:6px;color:#666;">This stays in your browser (localStorage).</small>
+            </div>
+
             <div class="auto-row">
               <button class="btn btn-success" id="autoStartBtn">⏱️ Start Auto Campaign</button>
               <button class="btn btn-danger" id="autoStopBtn">🛑 Stop Auto Campaign</button>
@@ -269,6 +276,19 @@
   </div>
 
 <script>
+  // ✅ Secret helpers (stored only in browser localStorage)
+  function getAutoSecret() {
+    return localStorage.getItem("AUTO_SECRET") || "";
+  }
+  function setAutoSecret(secret) {
+    localStorage.setItem("AUTO_SECRET", secret || "");
+  }
+  function requireAutoSecretOrThrow() {
+    const s = getAutoSecret();
+    if (!s) throw new Error("AUTO_SECRET is missing. Enter it in the Auto Secret field.");
+    return s;
+  }
+
   // Global State
   const state = {
     contacts: [],
@@ -284,7 +304,8 @@
 
     async sendEmail(emailData) {
       const response = await fetch(`${this.baseURL}/api/send-email`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(emailData)
       });
       const result = await response.json();
@@ -294,7 +315,8 @@
 
     async sendBulkEmails(bulkData) {
       const response = await fetch(`${this.baseURL}/api/send-bulk-emails`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bulkData)
       });
       const result = await response.json();
@@ -302,16 +324,25 @@
       return result;
     }
 
+    // ✅ PROTECTED endpoints (require x-auto-secret)
     async getAccounts() {
-      const response = await fetch(`${this.baseURL}/api/accounts`);
+      const secret = requireAutoSecretOrThrow();
+      const response = await fetch(`${this.baseURL}/api/accounts`, {
+        headers: { 'x-auto-secret': secret }
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to fetch accounts');
       return result.accounts;
     }
 
     async setAccountStatus(accountId, connected) {
+      const secret = requireAutoSecretOrThrow();
       const response = await fetch(`${this.baseURL}/api/accounts-set-status`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auto-secret': secret
+        },
         body: JSON.stringify({ accountId, connected })
       });
       const result = await response.json();
@@ -320,8 +351,13 @@
     }
 
     async autoStart(payload) {
+      const secret = requireAutoSecretOrThrow();
       const response = await fetch(`${this.baseURL}/api/auto-start`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auto-secret': secret
+        },
         body: JSON.stringify(payload)
       });
       const result = await response.json();
@@ -330,14 +366,21 @@
     }
 
     async autoStop() {
-      const response = await fetch(`${this.baseURL}/api/auto-stop`, { method: 'POST' });
+      const secret = requireAutoSecretOrThrow();
+      const response = await fetch(`${this.baseURL}/api/auto-stop`, {
+        method: 'POST',
+        headers: { 'x-auto-secret': secret }
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to stop auto campaign');
       return result;
     }
 
     async autoStatus() {
-      const response = await fetch(`${this.baseURL}/api/auto-status`);
+      const secret = requireAutoSecretOrThrow();
+      const response = await fetch(`${this.baseURL}/api/auto-status`, {
+        headers: { 'x-auto-secret': secret }
+      });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to fetch auto status');
       return result;
@@ -354,6 +397,12 @@
     setupEventListeners();
     initializeUploadZone();
     loadSavedTemplateFromLocalStorage();
+
+    // ✅ Load saved AUTO_SECRET into input (browser localStorage)
+    const savedSecret = getAutoSecret();
+    if (savedSecret) document.getElementById('autoSecretInput').value = savedSecret;
+
+    // Accounts and auto status will load only if secret exists
     loadAccountsFromBackend();
     updateMergeFields([]); // will update after csv upload
     updateStats();
@@ -376,6 +425,16 @@
     ['brandName','subjectLine','emailContent','templateName'].forEach(id => {
       const el = document.getElementById(id);
       el.addEventListener('input', saveTemplateToLocalStorage);
+    });
+
+    // ✅ Save secret to localStorage as you type
+    const secretInput = document.getElementById("autoSecretInput");
+    secretInput.addEventListener("input", () => setAutoSecret(secretInput.value));
+
+    // ✅ When secret changes, reload accounts + auto status
+    secretInput.addEventListener("change", () => {
+      loadAccountsFromBackend();
+      refreshAutoStatus();
     });
   }
 
@@ -409,6 +468,12 @@
 
   async function loadAccountsFromBackend() {
     try {
+      // If secret not present, do not spam errors; show a helpful log.
+      if (!getAutoSecret()) {
+        log('Enter Auto Secret to load accounts + auto features.', 'warning');
+        return;
+      }
+
       const accounts = await emailAPI.getAccounts();
       // pick first connected as active default
       state.emailAccounts = accounts.map((a, idx) => ({
@@ -724,6 +789,12 @@
 
   async function refreshAutoStatus() {
     try {
+      if (!getAutoSecret()) {
+        document.getElementById('autoStatusBox').innerHTML =
+          `Auto Status: <strong>Secret required</strong><br><span style="color:#666;">Enter Auto Secret to view status.</span>`;
+        return;
+      }
+
       const s = await emailAPI.autoStatus();
       const box = document.getElementById('autoStatusBox');
 

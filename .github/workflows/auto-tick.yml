@@ -2,8 +2,8 @@ name: Auto Tick Hourly
 
 on:
   schedule:
-    - cron: "0 * * * *"   
-  workflow_dispatch:       
+    - cron: "0 * * * *"
+  workflow_dispatch:
 
 jobs:
   tick:
@@ -11,6 +11,7 @@ jobs:
     steps:
       - name: Call auto-tick
         run: |
-          curl -sS -X POST "${{ secrets.AUTO_TICK_URL }}" \
+          curl -sS -X POST "${{ secrets.MY_AUTO_TICK_ENDPOINT }}" \
             -H "Content-Type: application/json" \
+            -H "x-auto-secret: ${{ secrets.AUTO_SECRET }}" \
             --data "{}"
