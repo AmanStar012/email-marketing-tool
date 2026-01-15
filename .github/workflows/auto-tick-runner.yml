@@ -1,19 +1,18 @@
 name: Auto Tick Hourly (Runner)
 
 on:
-  workflow_dispatch:   # manual run button
   schedule:
-    - cron: "0 * * * *"   # every hour
+    - cron: "0 * * * *"
+  workflow_dispatch:
 
 jobs:
-  auto-tick:
+  tick:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Call auto-tick API
+      - name: Call auto-tick (production)
         run: |
           echo "Triggering auto-tick..."
-          curl -sS -X POST "${{ secrets.AUTO_TICK_URL }}" \
+          curl -i -sS -X POST "${{ secrets.AUTO_TICK_URL }}" \
             -H "Content-Type: application/json" \
             -H "x-auto-secret: ${{ secrets.AUTO_SECRET }}" \
             --data "{}"
