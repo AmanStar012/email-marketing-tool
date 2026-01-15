@@ -2,16 +2,15 @@ name: Auto Tick Hourly (Runner)
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 120   # long safe
-
+    timeout-minutes: 55
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node
@@ -19,14 +18,14 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install deps
+      - name: Install
         run: npm ci
 
-      - name: Run auto tick runner
+      - name: Run Auto Tick Sender
         env:
           REDIS_URL: ${{ secrets.REDIS_URL }}
-          AUTO_SECRET: ${{ secrets.AUTO_SECRET }}
-          # Gmail pass secrets (add as many as needed)
+
+          # Pass secrets for each account id
           PASS_1: ${{ secrets.PASS_1 }}
           PASS_2: ${{ secrets.PASS_2 }}
           PASS_3: ${{ secrets.PASS_3 }}
@@ -61,12 +60,5 @@ jobs:
           PASS_32: ${{ secrets.PASS_32 }}
           PASS_33: ${{ secrets.PASS_33 }}
           PASS_34: ${{ secrets.PASS_34 }}
-          PASS_35: ${{ secrets.PASS_35 }}
 
-          # Optional tuning
-          SEND_CONCURRENCY: "5"
-          EMAILS_PER_ACCOUNT_PER_HOUR: "40"
-          PER_EMAIL_DELAY_MS: "1000"
-          MAX_EVENTS: "300"
-
-        run: node scripts/auto_tick_runner.js
+        run: node scripts/auto-tick-runner.js
