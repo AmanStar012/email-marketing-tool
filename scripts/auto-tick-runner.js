@@ -1,5 +1,8 @@
 /* scripts/auto-tick-runner.js
    GitHub Actions runner: sends auto campaign emails using Redis state.
+   - Uses a GLOBAL QUEUE so if an account fails/quota hits, the SAME contact can be retried
+     by the next account in the SAME tick.
+   - Stores leftover unsent contacts into Redis retry queue for next tick.
 */
 
 const fs = require("fs");
@@ -14,6 +17,10 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function applyMerge(str, vars) {
   if (!str) return "";
   let out = String(str);
@@ -21,13 +28,8 @@ function applyMerge(str, vars) {
     const re = new RegExp(`{{\\s*${escapeRegExp(k)}\\s*}}`, "g");
     out = out.replace(re, v == null ? "" : String(v));
   }
-  // remove any leftover {{...}}
   out = out.replace(/{{[^}]*}}/g, "");
   return out;
-}
-
-function escapeRegExp(s) {
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function convertTextToHTML(text) {
@@ -42,20 +44,33 @@ function convertTextToHTML(text) {
     .replace(/$/, "</div>");
 }
 
-// very basic account-level failure detection
+// Account-level failure (disable account)
 function looksLikeAccountLevelFailure(err) {
   const msg = (err && err.message ? err.message : "").toLowerCase();
-
   return (
     msg.includes("invalid login") ||
     msg.includes("username and password not accepted") ||
     msg.includes("authentication failed") ||
-    msg.includes("auth") && msg.includes("failed") ||
-    msg.includes("daily user sending quota exceeded") ||
+    (msg.includes("auth") && msg.includes("failed")) ||
+    msg.includes("daily user sending limit exceeded") ||
     msg.includes("rate limit") ||
     msg.includes("too many login attempts") ||
     msg.includes("account disabled") ||
     msg.includes("bad credentials")
+  );
+}
+
+// Permanent recipient failure (do NOT retry with another account)
+function looksLikePermanentRecipientFailure(err) {
+  const msg = (err && err.message ? err.message : "").toLowerCase();
+  return (
+    msg.includes("5.1.1") || // user unknown
+    msg.includes("no such user") ||
+    msg.includes("recipient address rejected") ||
+    msg.includes("mailbox unavailable") ||
+    msg.includes("address not found") ||
+    msg.includes("invalid recipient") ||
+    msg.includes("domain not found")
   );
 }
 
@@ -77,8 +92,6 @@ function createTransporter(account) {
   if (!account?.email || !account?.pass) {
     throw new Error(`Missing email/pass for account id=${account?.id}`);
   }
-
-  // Gmail SMTP
   return nodemailer.createTransport({
     service: "gmail",
     auth: { user: account.email, pass: account.pass }
@@ -100,6 +113,19 @@ async function redisSetJSON(redis, key, value) {
   await redis.set(key, JSON.stringify(value));
 }
 
+function extractTo(c) {
+  return (
+    c.email ||
+    c.Email ||
+    c.EMAIL ||
+    c["Email Address"] ||
+    c.email_address ||
+    c.mail ||
+    c.Mail ||
+    ""
+  );
+}
+
 // -------------------------
 // Main
 // -------------------------
@@ -107,10 +133,7 @@ async function redisSetJSON(redis, key, value) {
   const REDIS_URL = process.env.REDIS_URL;
   if (!REDIS_URL) throw new Error("Missing REDIS_URL env var (add it to GitHub Secrets)");
 
-  const redis = new Redis(REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true
-  });
+  const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3, enableReadyCheck: true });
 
   try {
     const activeId = await redis.get("auto:campaign:active");
@@ -123,6 +146,7 @@ async function redisSetJSON(redis, key, value) {
     const liveKey = `auto:campaign:${activeId}:live`;
     const statsKey = `auto:campaign:${activeId}:stats`;
     const eventsKey = `auto:campaign:${activeId}:events`;
+    const retryKey = `auto:campaign:${activeId}:retry`; // stores unsent contacts for next tick
 
     const campaign = await redisGetJSON(redis, campaignKey);
     if (!campaign) {
@@ -136,9 +160,10 @@ async function redisSetJSON(redis, key, value) {
       process.exit(0);
     }
 
+    // runtime connected/disconnected accounts
     const accounts = loadAccountsConfig();
     const runtime = (await redisGetJSON(redis, "accounts:runtime")) || {};
-    const connectedAccounts = accounts.filter((a) => runtime[String(a.id)]?.connected !== false);
+    let connectedAccounts = accounts.filter((a) => runtime[String(a.id)]?.connected !== false);
 
     const emailsPerAcc = Number(campaign.emailsPerAccountPerHour || 40);
     const delayMs = Number(campaign.perEmailDelayMs || 1000);
@@ -146,7 +171,7 @@ async function redisSetJSON(redis, key, value) {
     const total = campaign.contacts.length;
     let cursor = campaign.cursor || 0;
 
-    // Initialize stats
+    // Stats init
     let stats = (await redisGetJSON(redis, statsKey)) || {
       campaignId: campaign.id,
       totalSent: 0,
@@ -154,13 +179,13 @@ async function redisSetJSON(redis, key, value) {
       byAccount: {}
     };
 
-    // Events list (cap last 500)
+    // Events list
     let events = (await redisGetJSON(redis, eventsKey)) || [];
     if (!Array.isArray(events)) events = [];
 
     async function pushEvent(ev) {
       events.push(ev);
-      if (events.length > 500) events = events.slice(-500);
+      if (events.length > 800) events = events.slice(-800);
       await redisSetJSON(redis, eventsKey, events);
     }
 
@@ -187,67 +212,102 @@ async function redisSetJSON(redis, key, value) {
       process.exit(0);
     }
 
-    // Build hour plan: each connected account gets up to 40 contacts from remaining cursor
-    const hourPlan = [];
-    let tmpCursor = cursor;
+    // ---------
+    // Build global queue for this tick
+    // - first take from retry queue
+    // - then take fresh contacts from main list (cursor ..)
+    // Total capacity this tick = connectedAccounts * emailsPerAcc
+    // ---------
+    const tickCapacity = connectedAccounts.length * emailsPerAcc;
 
-    for (const acc of connectedAccounts) {
-      const start = tmpCursor;
-      const end = Math.min(tmpCursor + emailsPerAcc, total);
-      if (start >= end) break;
+    let retryQueue = (await redisGetJSON(redis, retryKey)) || [];
+    if (!Array.isArray(retryQueue)) retryQueue = [];
 
-      hourPlan.push({ account: acc, contacts: campaign.contacts.slice(start, end) });
-      tmpCursor = end;
-    }
+    const fromRetry = retryQueue.slice(0, tickCapacity);
+    retryQueue = retryQueue.slice(fromRetry.length);
 
-    // Save cursor early so next tick doesn't resend same contacts
-    campaign.cursor = tmpCursor;
+    const remainingCapacity = tickCapacity - fromRetry.length;
+    const fromMain = campaign.contacts.slice(cursor, Math.min(cursor + remainingCapacity, total));
+    const takenFromMain = fromMain.length;
+
+    // Advance cursor ONLY for what we pulled from main
+    campaign.cursor = cursor + takenFromMain;
     campaign.updatedAt = Date.now();
     await redisSetJSON(redis, campaignKey, campaign);
 
-    console.log(`[AUTO] Tick started. Cursor now reserved: ${cursor} -> ${tmpCursor} (total=${total})`);
-    console.log(`[AUTO] Accounts this tick: ${hourPlan.length}, per account up to ${emailsPerAcc}`);
+    // Save leftover retry back
+    await redisSetJSON(redis, retryKey, retryQueue);
 
-    // We do small concurrency to avoid slamming Gmail
-    const CONCURRENCY = 3;
-    let idx = 0;
+    // Global queue: items we attempt to send this tick
+    const queue = [...fromRetry, ...fromMain];
 
-    async function sendBatchForAccount(account, contactsSlice) {
-      const idStr = String(account.id);
+    console.log(`[AUTO] Tick capacity=${tickCapacity}, pulled retry=${fromRetry.length}, pulled main=${takenFromMain}`);
+    console.log(`[AUTO] Cursor advanced: ${cursor} -> ${campaign.cursor} (total=${total})`);
+    console.log(`[AUTO] Connected accounts now: ${connectedAccounts.length}, per account limit=${emailsPerAcc}`);
+    console.log(`[AUTO] Queue size this tick: ${queue.length}`);
 
+    if (queue.length === 0) {
+      // Nothing to do (maybe only retry left but was empty + no new)
+      await setLive({ state: "idle_waiting_next_tick", currentEmail: null, currentAccountId: null, currentSenderName: null });
+      console.log("[AUTO] Nothing queued this tick.");
+      process.exit(0);
+    }
+
+    // If an email can't be sent even after trying multiple accounts in same tick,
+    // we push it back for next tick:
+    const carryOver = [];
+
+    // Helper to init per-account stats
+    function ensureAccountStats(a) {
+      const idStr = String(a.id);
       if (!stats.byAccount[idStr]) {
         stats.byAccount[idStr] = {
-          email: account.email,
-          senderName: account.senderName || "",
+          email: a.email,
+          senderName: a.senderName || "",
           sent: 0,
           failed: 0,
           lastSentAt: 0
         };
       }
+      return idStr;
+    }
+
+    // ---------
+    // Main sending loop: account by account, max emailsPerAcc
+    // If account fails/quota -> disconnect and move on, WITHOUT popping queue item
+    // ---------
+    const results = [];
+
+    for (const account of connectedAccounts) {
+      const idStr = ensureAccountStats(account);
 
       let transporter;
       try {
         transporter = createTransporter(account);
       } catch (e) {
-        // disable if missing pass
         runtime[idStr] = runtime[idStr] || {};
         runtime[idStr].connected = false;
         runtime[idStr].lastError = e.message;
         await redisSetJSON(redis, "accounts:runtime", runtime);
 
-        console.log(`[AUTO] Account ${account.email} disabled: ${e.message}`);
-        return { accountId: account.id, email: account.email, sent: 0, failed: contactsSlice.length, errors: [{ error: e.message }] };
+        console.log(`[AUTO] Account disabled (missing creds): ${account.email} :: ${e.message}`);
+        results.push({ accountId: account.id, email: account.email, sent: 0, failed: 0, errors: [{ error: e.message }] });
+        continue;
       }
 
       let sent = 0;
       let failed = 0;
       const errors = [];
 
-      for (const c of contactsSlice) {
-        const to =
-          c.email || c.Email || c.EMAIL || c["Email Address"] || c.email_address || c.mail || c.Mail || "";
+      for (let i = 0; i < emailsPerAcc; i++) {
+        if (queue.length === 0) break;
+
+        const c = queue[0]; // IMPORTANT: don't shift until success/permanent-fail
+        const to = extractTo(c);
 
         if (!to) {
+          // permanent row issue -> drop it
+          queue.shift();
           failed++;
           stats.totalFailed++;
           stats.byAccount[idStr].failed++;
@@ -275,11 +335,7 @@ async function redisSetJSON(redis, key, value) {
             currentTo: to
           });
 
-          const vars = {
-            brandName: campaign.brandName,
-            senderName: account.senderName || "",
-            ...c
-          };
+          const vars = { brandName: campaign.brandName, senderName: account.senderName || "", ...c };
 
           const subj = applyMerge(campaign.template.subject, vars);
           const bodyText = applyMerge(campaign.template.content, vars);
@@ -291,6 +347,9 @@ async function redisSetJSON(redis, key, value) {
             subject: subj,
             html
           });
+
+          // success -> pop from queue
+          queue.shift();
 
           sent++;
           stats.totalSent++;
@@ -309,6 +368,67 @@ async function redisSetJSON(redis, key, value) {
 
           if (delayMs > 0) await sleep(delayMs);
         } catch (err) {
+          const msg = err?.message || "Unknown error";
+
+          // If account-level failure -> disconnect this account and move to NEXT account
+          // IMPORTANT: do NOT pop queue[0] so next account will try SAME contact
+          if (looksLikeAccountLevelFailure(err)) {
+            runtime[idStr] = runtime[idStr] || {};
+            runtime[idStr].connected = false;
+            runtime[idStr].lastError = msg;
+            await redisSetJSON(redis, "accounts:runtime", runtime);
+
+            // log event as failed attempt (but contact stays)
+            failed++;
+            stats.totalFailed++;
+            stats.byAccount[idStr].failed++;
+            await redisSetJSON(redis, statsKey, stats);
+
+            await pushEvent({
+              ts: Date.now(),
+              accountId: account.id,
+              from: account.email,
+              senderName: account.senderName || "",
+              to,
+              status: "failed",
+              error: msg,
+              note: "account_disabled_try_next_account"
+            });
+
+            console.log(`[AUTO] Account disabled due to failure: ${account.email} :: ${msg}`);
+            errors.push({ email: to, error: msg });
+
+            break; // next account
+          }
+
+          // Permanent recipient problem -> drop this contact (do not retry with other account)
+          if (looksLikePermanentRecipientFailure(err)) {
+            queue.shift();
+
+            failed++;
+            stats.totalFailed++;
+            stats.byAccount[idStr].failed++;
+            await redisSetJSON(redis, statsKey, stats);
+
+            await pushEvent({
+              ts: Date.now(),
+              accountId: account.id,
+              from: account.email,
+              senderName: account.senderName || "",
+              to,
+              status: "failed",
+              error: msg,
+              note: "permanent_recipient_failure_dropped"
+            });
+
+            errors.push({ email: to, error: msg });
+            continue;
+          }
+
+          // Other transient error -> move contact to carryOver for next tick
+          queue.shift();
+          carryOver.push(c);
+
           failed++;
           stats.totalFailed++;
           stats.byAccount[idStr].failed++;
@@ -321,52 +441,57 @@ async function redisSetJSON(redis, key, value) {
             senderName: account.senderName || "",
             to,
             status: "failed",
-            error: err.message
+            error: msg,
+            note: "transient_moved_to_retry"
           });
 
-          errors.push({ email: to, error: err.message });
-
-          if (looksLikeAccountLevelFailure(err)) {
-            runtime[idStr] = runtime[idStr] || {};
-            runtime[idStr].connected = false;
-            runtime[idStr].lastError = err.message;
-            await redisSetJSON(redis, "accounts:runtime", runtime);
-
-            console.log(`[AUTO] Account ${account.email} disabled due to failure: ${err.message}`);
-            break;
-          }
+          errors.push({ email: to, error: msg });
         }
       }
 
-      return { accountId: account.id, email: account.email, sent, failed, errors };
+      results.push({ accountId: account.id, email: account.email, sent, failed, errors });
     }
 
-    const results = [];
-    const workers = new Array(Math.min(CONCURRENCY, hourPlan.length)).fill(0).map(async () => {
-      while (idx < hourPlan.length) {
-        const my = idx++;
-        const job = hourPlan[my];
-        const r = await sendBatchForAccount(job.account, job.contacts);
-        results.push(r);
-      }
-    });
+    // Anything still left in queue could not be sent within account limits this tick -> retry next hour
+    const leftovers = [...queue, ...carryOver];
 
-    await Promise.all(workers);
+    if (leftovers.length > 0) {
+      // merge with existing retry (prepend so they go next tick first)
+      let existingRetry = (await redisGetJSON(redis, retryKey)) || [];
+      if (!Array.isArray(existingRetry)) existingRetry = [];
 
-    // mark completed if cursor reached end
-    if (campaign.cursor >= total) {
+      const merged = [...leftovers, ...existingRetry];
+
+      // cap retry size to prevent infinite growth
+      const MAX_RETRY = 10000;
+      await redisSetJSON(redis, retryKey, merged.slice(0, MAX_RETRY));
+
+      console.log(`[AUTO] Stored retry leftovers: ${leftovers.length} (retry total capped to ${MAX_RETRY})`);
+    } else {
+      console.log("[AUTO] No leftovers to retry.");
+    }
+
+    // Completion check:
+    // Completed only if:
+    // 1) cursor reached end AND
+    // 2) retry queue is empty
+    const retryNow = (await redisGetJSON(redis, retryKey)) || [];
+    const retryCount = Array.isArray(retryNow) ? retryNow.length : 0;
+
+    if (campaign.cursor >= total && retryCount === 0) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
       await redisSetJSON(redis, campaignKey, campaign);
       await redis.set("auto:campaign:last", campaign.id);
       await redis.del("auto:campaign:active");
-      await setLive({ state: "completed", currentEmail: null, currentAccountId: null, currentSenderName: null });
 
+      await setLive({ state: "completed", currentEmail: null, currentAccountId: null, currentSenderName: null });
       await pushEvent({ ts: Date.now(), status: "campaign_completed", campaignId: campaign.id });
+
       console.log("[AUTO] Tick finished and campaign completed.");
     } else {
       await setLive({ state: "idle_waiting_next_tick", currentEmail: null, currentAccountId: null, currentSenderName: null });
-      console.log("[AUTO] Tick finished. Waiting for next hour.");
+      console.log(`[AUTO] Tick finished. Next tick will continue. cursor=${campaign.cursor}/${total}, retry=${retryCount}`);
     }
 
     console.log("[AUTO] Batch results:", JSON.stringify(results, null, 2));
