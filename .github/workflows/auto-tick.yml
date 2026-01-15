@@ -1,4 +1,4 @@
-name: Auto Tick Hourly (Runner)
+name: Auto Tick Hourly
 
 on:
   schedule:
@@ -8,57 +8,10 @@ on:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install
-        run: npm ci
-
-      - name: Run Auto Tick Sender
-        env:
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-
-          # Pass secrets for each account id
-          PASS_1: ${{ secrets.PASS_1 }}
-          PASS_2: ${{ secrets.PASS_2 }}
-          PASS_3: ${{ secrets.PASS_3 }}
-          PASS_4: ${{ secrets.PASS_4 }}
-          PASS_5: ${{ secrets.PASS_5 }}
-          PASS_6: ${{ secrets.PASS_6 }}
-          PASS_7: ${{ secrets.PASS_7 }}
-          PASS_8: ${{ secrets.PASS_8 }}
-          PASS_9: ${{ secrets.PASS_9 }}
-          PASS_10: ${{ secrets.PASS_10 }}
-          PASS_11: ${{ secrets.PASS_11 }}
-          PASS_12: ${{ secrets.PASS_12 }}
-          PASS_13: ${{ secrets.PASS_13 }}
-          PASS_14: ${{ secrets.PASS_14 }}
-          PASS_15: ${{ secrets.PASS_15 }}
-          PASS_16: ${{ secrets.PASS_16 }}
-          PASS_17: ${{ secrets.PASS_17 }}
-          PASS_18: ${{ secrets.PASS_18 }}
-          PASS_19: ${{ secrets.PASS_19 }}
-          PASS_20: ${{ secrets.PASS_20 }}
-          PASS_21: ${{ secrets.PASS_21 }}
-          PASS_22: ${{ secrets.PASS_22 }}
-          PASS_23: ${{ secrets.PASS_23 }}
-          PASS_24: ${{ secrets.PASS_24 }}
-          PASS_25: ${{ secrets.PASS_25 }}
-          PASS_26: ${{ secrets.PASS_26 }}
-          PASS_27: ${{ secrets.PASS_27 }}
-          PASS_28: ${{ secrets.PASS_28 }}
-          PASS_29: ${{ secrets.PASS_29 }}
-          PASS_30: ${{ secrets.PASS_30 }}
-          PASS_31: ${{ secrets.PASS_31 }}
-          PASS_32: ${{ secrets.PASS_32 }}
-          PASS_33: ${{ secrets.PASS_33 }}
-          PASS_34: ${{ secrets.PASS_34 }}
-
-        run: node scripts/auto-tick-runner.js
+      - name: Call auto-tick
+        run: |
+          curl -sS -X POST "${{ secrets.MY_AUTO_TICK_ENDPOINT }}" \
+            -H "Content-Type: application/json" \
+            -H "x-auto-secret: ${{ secrets.AUTO_SECRET }}" \
+            --data "{}"
