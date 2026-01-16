@@ -1,16 +1,4 @@
-// api/auto-tick.js
-const {
-  cors,
-  sleep,
-  convertTextToHTML,
-  createTransporter,
-  looksLikeAccountLevelFailure,
-  applyMerge,
-  loadAccountsConfig,
-  redisGet,
-  redisSet,
-  redisDel
-} = require("./_shared");
+const { cors, sleep, convertTextToHTML, createTransporter, looksLikeAccountLevelFailure, applyMerge, loadAccountsConfig, redisGet, redisSet, redisDel } = require("./_shared");
 
 module.exports = async function handler(req, res) {
   cors(res);
@@ -18,6 +6,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ success: false, error: "Method not allowed" });
 
   try {
+    // Check if the campaign is running
     const activeId = await redisGet("auto:campaign:active");
     if (!activeId) return res.status(200).json({ success: true, message: "No active campaign" });
 
@@ -27,12 +16,7 @@ module.exports = async function handler(req, res) {
     const eventsKey = `auto:campaign:${activeId}:events`;
 
     const campaign = await redisGet(campaignKey);
-    if (!campaign) {
-      await redisDel("auto:campaign:active");
-      return res.status(200).json({ success: true, message: "Campaign missing; cleared active pointer" });
-    }
-
-    if (campaign.status !== "running") {
+    if (!campaign || campaign.status !== "running") {
       return res.status(200).json({ success: true, message: `Campaign status: ${campaign.status}` });
     }
 
@@ -46,45 +30,8 @@ module.exports = async function handler(req, res) {
     const total = campaign.contacts.length;
     let cursor = campaign.cursor || 0;
 
-    // ensure stats exists
-    let stats = (await redisGet(statsKey)) || {
-      campaignId: campaign.id,
-      totalSent: 0,
-      totalFailed: 0,
-      byAccount: {}
-    };
-
-    const pushEvent = async (ev) => {
-      let events = (await redisGet(eventsKey)) || [];
-      events.push(ev);
-      // cap to last 300 events
-      if (events.length > 300) events = events.slice(-300);
-      await redisSet(eventsKey, events);
-    };
-
-    const setLive = async (payload) => {
-      await redisSet(liveKey, { ...payload, updatedAt: Date.now() });
-    };
-
-    // Completed case
-    if (cursor >= total) {
-      campaign.status = "completed";
-      campaign.updatedAt = Date.now();
-      await redisSet(campaignKey, campaign);
-      await redisSet("auto:campaign:last", campaign.id);
-      await redisDel("auto:campaign:active");
-      await setLive({ currentAccountId: null, currentEmail: null, currentSenderName: null, state: "completed" });
-
-      return res.status(200).json({ success: true, message: "Completed (no contacts left)" });
-    }
-
-    if (connectedAccounts.length === 0) {
-      await setLive({ currentAccountId: null, currentEmail: null, currentSenderName: null, state: "idle_no_accounts" });
-      return res.status(200).json({ success: true, message: "No connected accounts; nothing sent" });
-    }
-
-    const CONCURRENCY = 5;
-
+    // Handle concurrency control: send emails from multiple accounts
+    const CONCURRENCY = 20;
     const hourPlan = [];
     let tmpCursor = cursor;
 
@@ -101,58 +48,26 @@ module.exports = async function handler(req, res) {
       tmpCursor = end;
     }
 
-    // Save cursor early (so we don't resend next tick)
+    // Save cursor early to prevent re-sending in the next tick
     campaign.cursor = tmpCursor;
     campaign.updatedAt = Date.now();
     await redisSet(campaignKey, campaign);
 
     const sendBatchForAccount = async (account, contactsSlice) => {
       const accountIdStr = String(account.id);
-      if (!stats.byAccount[accountIdStr]) {
-        stats.byAccount[accountIdStr] = {
-          email: account.email,
-          senderName: account.senderName || "",
-          sent: 0,
-          failed: 0,
-          lastSentAt: 0
-        };
-      }
-
       let transporter = createTransporter(account);
-
       let sent = 0;
       let failed = 0;
 
       for (const c of contactsSlice) {
-        const to =
-          c.email || c.Email || c.EMAIL || c["Email Address"] || c.email_address || c.mail || c.Mail || "";
-
+        const to = c.email || c.Email || c["Email Address"];
         if (!to) {
           failed++;
-          stats.totalFailed++;
-          stats.byAccount[accountIdStr].failed++;
-          await redisSet(statsKey, stats);
-          await pushEvent({
-            ts: Date.now(),
-            accountId: account.id,
-            from: account.email,
-            senderName: account.senderName || "",
-            to: "",
-            status: "failed",
-            error: "Missing email in contact row"
-          });
           continue;
         }
 
         try {
-          await setLive({
-            state: "sending",
-            currentAccountId: account.id,
-            currentEmail: account.email,
-            currentSenderName: account.senderName || "",
-            currentTo: to
-          });
-
+          // Send the email
           const vars = {
             brandName: campaign.brandName,
             senderName: account.senderName,
@@ -171,40 +86,11 @@ module.exports = async function handler(req, res) {
           });
 
           sent++;
-          stats.totalSent++;
-          stats.byAccount[accountIdStr].sent++;
-          stats.byAccount[accountIdStr].lastSentAt = Date.now();
-          await redisSet(statsKey, stats);
-
-          await pushEvent({
-            ts: Date.now(),
-            accountId: account.id,
-            from: account.email,
-            senderName: account.senderName || "",
-            to,
-            status: "sent"
-          });
-
-          if (delayMs > 0) await sleep(delayMs);
         } catch (err) {
           failed++;
-          stats.totalFailed++;
-          stats.byAccount[accountIdStr].failed++;
-          await redisSet(statsKey, stats);
-          await pushEvent({
-            ts: Date.now(),
-            accountId: account.id,
-            from: account.email,
-            senderName: account.senderName || "",
-            to,
-            status: "failed",
-            error: err.message
-          });
-
           if (looksLikeAccountLevelFailure(err)) {
             runtime[accountIdStr] = runtime[accountIdStr] || {};
             runtime[accountIdStr].connected = false;
-            runtime[accountIdStr].lastError = err.message || "Account disabled due to failure";
             await redisSet("accounts:runtime", runtime);
             break;
           }
@@ -215,12 +101,9 @@ module.exports = async function handler(req, res) {
     };
 
     const results = [];
-    let idx = 0;
-
     const workers = new Array(Math.min(CONCURRENCY, hourPlan.length)).fill(0).map(async () => {
-      while (idx < hourPlan.length) {
-        const myIndex = idx++;
-        const job = hourPlan[myIndex];
+      while (hourPlan.length > 0) {
+        const job = hourPlan.shift();
         const r = await sendBatchForAccount(job.account, job.contacts);
         results.push(r);
       }
@@ -228,13 +111,12 @@ module.exports = async function handler(req, res) {
 
     await Promise.all(workers);
 
+    // If campaign completed
     if (campaign.cursor >= total) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
       await redisSet(campaignKey, campaign);
-      await redisSet("auto:campaign:last", campaign.id);
       await redisDel("auto:campaign:active");
-
       await setLive({ state: "completed", currentEmail: null, currentAccountId: null, currentSenderName: null });
       await pushEvent({ ts: Date.now(), status: "campaign_completed", campaignId: campaign.id });
     } else {

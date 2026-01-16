@@ -12,21 +12,21 @@ module.exports = async function handler(req, res) {
     }
 
     const now = Date.now();
-    const key = `auto:campaign:${activeId}`;
+    const campaignKey = `auto:campaign:${activeId}`;
     const liveKey = `auto:campaign:${activeId}:live`;
     const eventsKey = `auto:campaign:${activeId}:events`;
 
-    const campaign = await redisGet(key);
+    const campaign = await redisGet(campaignKey);
     if (campaign) {
       campaign.status = "stopped";
       campaign.updatedAt = now;
-      await redisSet(key, campaign);
+      await redisSet(campaignKey, campaign);
     }
 
-    // keep last pointer so UI shows stopped campaign
+    // Keep last pointer so UI shows stopped campaign
     await redisSet("auto:campaign:last", activeId);
 
-    // update live state
+    // Update live state
     const live = (await redisGet(liveKey)) || {};
     await redisSet(liveKey, {
       ...live,
@@ -37,17 +37,17 @@ module.exports = async function handler(req, res) {
       updatedAt: now
     });
 
-    // push event
+    // Push event for stop action
     let events = (await redisGet(eventsKey)) || [];
     if (!Array.isArray(events)) events = [];
     events.push({ ts: now, status: "campaign_stopped", campaignId: activeId });
     if (events.length > 300) events = events.slice(-300);
     await redisSet(eventsKey, events);
 
-    // clear active pointer
+    // Clear active pointer
     await redisDel("auto:campaign:active");
 
-    return res.status(200).json({ success: true, message: "Stopped (campaign saved)" });
+    return res.status(200).json({ success: true, message: "Campaign stopped" });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
