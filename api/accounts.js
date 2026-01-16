@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
         id: a.id,
         email: a.email,
         senderName: a.senderName,
-        connected: rt.connected !== false, // default true
+        connected: rt.connected === true, 
         lastError: rt.lastError || ""
       };
     });
