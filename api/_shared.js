@@ -5,34 +5,23 @@ const path = require("path");
 const nodemailer = require("nodemailer");
 const { createClient } = require("redis");
 
-// Load .env.local only when running locally
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-/* -----------------------------
-   CORS
------------------------------- */
+// CORS handler
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-auto-secret");
 }
 
-/* -----------------------------
-   Sleep
------------------------------- */
+// Sleep function
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/* -----------------------------
-   Accounts Config
-   - Reads root /accounts.json
-   - pass priority:
-     1) accounts.json (pass/password)
-     2) env PASS_{id}
------------------------------- */
+// Load accounts from file
 function loadAccountsConfig() {
   const filePath = path.join(process.cwd(), "accounts.json");
 
@@ -56,7 +45,6 @@ function loadAccountsConfig() {
     const id = a.id;
     const email = (a.email || "").trim();
     const senderName = (a.senderName || "").trim();
-
     const passFromFile = String(a.pass || a.password || "").trim();
     const passFromEnv = String(process.env[`PASS_${id}`] || "").trim();
 
@@ -70,10 +58,7 @@ function loadAccountsConfig() {
   });
 }
 
-/* -----------------------------
-   Merge helper
-   replaces {{key}} with vars[key]
------------------------------- */
+// Merge helper function
 function applyMerge(text, vars = {}) {
   if (!text || typeof text !== "string") return text || "";
   let out = text;
@@ -92,9 +77,7 @@ function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/* -----------------------------
-   Text -> HTML (preserve breaks/spaces)
------------------------------- */
+// Convert text to HTML
 function convertTextToHTML(text) {
   if (!text) return "";
   return String(text)
@@ -107,9 +90,7 @@ function convertTextToHTML(text) {
     .replace(/$/, "</div>");
 }
 
-/* -----------------------------
-   Nodemailer Transporter
------------------------------- */
+// Nodemailer transporter creation
 function createTransporter(account) {
   const user = (account.email || "").trim();
   const pass = (account.pass || "").trim();
@@ -125,34 +106,7 @@ function createTransporter(account) {
   });
 }
 
-/* -----------------------------
-   Detect account-level failures
-   (so we can mark account disconnected)
------------------------------- */
-function looksLikeAccountLevelFailure(err) {
-  const msg = String(err?.message || err || "").toLowerCase();
-
-  // common Gmail/auth issues
-  const patterns = [
-    "invalid login",
-    "authentication failed",
-    "username and password not accepted",
-    "bad credentials",
-    "535",
-    "534",
-    "account disabled",
-    "too many login attempts",
-    "application-specific password required",
-    "web login required",
-    "sign-in required"
-  ];
-
-  return patterns.some((p) => msg.includes(p));
-}
-
-/* -----------------------------
-   Redis (Option B) via REDIS_URL
------------------------------- */
+// Redis client setup
 let _redisClient = null;
 let _redisConnecting = null;
 
@@ -208,15 +162,11 @@ async function redisDel(key) {
   return true;
 }
 
-/* -----------------------------
-   Exports
------------------------------- */
 module.exports = {
   cors,
   sleep,
   convertTextToHTML,
   createTransporter,
-  looksLikeAccountLevelFailure,
   applyMerge,
   loadAccountsConfig,
   redisGet,

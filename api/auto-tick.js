@@ -1,3 +1,4 @@
+// api/auto-tick.js
 const {
   cors,
   sleep,
@@ -17,14 +18,6 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ success: false, error: "Method not allowed" });
 
   try {
-    // Secret protection (GitHub Actions / private calls)
-    const secret = req.headers["x-auto-secret"];
-    const expected = process.env.AUTO_SECRET;
-    if (!expected) return res.status(500).json({ success: false, error: "Missing AUTO_SECRET env var" });
-    if (!secret || secret !== expected) {
-      return res.status(401).json({ success: false, error: "Unauthorized (bad auto secret)" });
-    }
-
     const activeId = await redisGet("auto:campaign:active");
     if (!activeId) return res.status(200).json({ success: true, message: "No active campaign" });
 
@@ -61,11 +54,8 @@ module.exports = async function handler(req, res) {
       byAccount: {}
     };
 
-    // ensure events exists
-    let events = (await redisGet(eventsKey)) || [];
-    if (!Array.isArray(events)) events = [];
-
     const pushEvent = async (ev) => {
+      let events = (await redisGet(eventsKey)) || [];
       events.push(ev);
       // cap to last 300 events
       if (events.length > 300) events = events.slice(-300);
@@ -93,10 +83,8 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, message: "No connected accounts; nothing sent" });
     }
 
-    // Concurrency control (avoid 34 SMTP at once)
     const CONCURRENCY = 5;
 
-    // Build this hour plan (each account gets up to emailsPerAcc from remaining cursor)
     const hourPlan = [];
     let tmpCursor = cursor;
 
@@ -120,7 +108,6 @@ module.exports = async function handler(req, res) {
 
     const sendBatchForAccount = async (account, contactsSlice) => {
       const accountIdStr = String(account.id);
-
       if (!stats.byAccount[accountIdStr]) {
         stats.byAccount[accountIdStr] = {
           email: account.email,
@@ -135,7 +122,6 @@ module.exports = async function handler(req, res) {
 
       let sent = 0;
       let failed = 0;
-      const errors = [];
 
       for (const c of contactsSlice) {
         const to =
@@ -146,8 +132,7 @@ module.exports = async function handler(req, res) {
           stats.totalFailed++;
           stats.byAccount[accountIdStr].failed++;
           await redisSet(statsKey, stats);
-
-          const ev = {
+          await pushEvent({
             ts: Date.now(),
             accountId: account.id,
             from: account.email,
@@ -155,20 +140,17 @@ module.exports = async function handler(req, res) {
             to: "",
             status: "failed",
             error: "Missing email in contact row"
-          };
-          await pushEvent(ev);
-
-          errors.push({ email: "missing", error: "Missing email in contact row" });
+          });
           continue;
         }
 
         try {
-          // LIVE UPDATE: which email currently sending from
           await setLive({
+            state: "sending",
             currentAccountId: account.id,
             currentEmail: account.email,
             currentSenderName: account.senderName || "",
-            state: "sending"
+            currentTo: to
           });
 
           const vars = {
@@ -182,7 +164,7 @@ module.exports = async function handler(req, res) {
           const html = convertTextToHTML(bodyText);
 
           await transporter.sendMail({
-            from: `${account.senderName} <${account.email}>`,
+            from: `${account.senderName || ""} <${account.email}>`,
             to,
             subject: subj,
             html
@@ -209,7 +191,6 @@ module.exports = async function handler(req, res) {
           stats.totalFailed++;
           stats.byAccount[accountIdStr].failed++;
           await redisSet(statsKey, stats);
-
           await pushEvent({
             ts: Date.now(),
             accountId: account.id,
@@ -220,21 +201,17 @@ module.exports = async function handler(req, res) {
             error: err.message
           });
 
-          errors.push({ email: to, error: err.message });
-
-          // Disable account if account-level failure
           if (looksLikeAccountLevelFailure(err)) {
             runtime[accountIdStr] = runtime[accountIdStr] || {};
             runtime[accountIdStr].connected = false;
             runtime[accountIdStr].lastError = err.message || "Account disabled due to failure";
             await redisSet("accounts:runtime", runtime);
-
             break;
           }
         }
       }
 
-      return { accountId: account.id, email: account.email, sent, failed, errors };
+      return { accountId: account.id, email: account.email, sent, failed };
     };
 
     const results = [];
@@ -251,7 +228,6 @@ module.exports = async function handler(req, res) {
 
     await Promise.all(workers);
 
-    // If finished -> mark completed + clear active pointer but keep last pointer
     if (campaign.cursor >= total) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
@@ -259,10 +235,10 @@ module.exports = async function handler(req, res) {
       await redisSet("auto:campaign:last", campaign.id);
       await redisDel("auto:campaign:active");
 
-      await setLive({ currentAccountId: null, currentEmail: null, currentSenderName: null, state: "completed" });
+      await setLive({ state: "completed", currentEmail: null, currentAccountId: null, currentSenderName: null });
       await pushEvent({ ts: Date.now(), status: "campaign_completed", campaignId: campaign.id });
     } else {
-      await setLive({ currentAccountId: null, currentEmail: null, currentSenderName: null, state: "idle_waiting_next_tick" });
+      await setLive({ state: "idle_waiting_next_tick", currentEmail: null, currentAccountId: null, currentSenderName: null });
     }
 
     return res.status(200).json({
