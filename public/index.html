@@ -804,7 +804,6 @@
       box.innerHTML = `
         Auto Status: ${statusPill}<br>
         Campaign: <strong>${escapeHtml(c.id)}</strong><br>
-        Brand: <strong>${escapeHtml(c.brandName || '')}</strong><br>
         Progress: <strong>${cursor}/${total}</strong> (${percent}%)<br>
         Updated: ${new Date(c.updatedAt).toLocaleString()}
       `;

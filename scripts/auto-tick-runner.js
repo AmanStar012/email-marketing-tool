@@ -136,12 +136,14 @@ function extractTo(c) {
   const redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3, enableReadyCheck: true });
 
   try {
+    // Step 1: Get active campaign ID from Redis
     const activeId = await redis.get("auto:campaign:active");
     if (!activeId) {
       console.log("[AUTO] No active campaign. Exiting.");
       process.exit(0);
     }
 
+    // Step 2: Check if the campaign exists and is running
     const campaignKey = `auto:campaign:${activeId}`;
     const liveKey = `auto:campaign:${activeId}:live`;
     const statsKey = `auto:campaign:${activeId}:stats`;
@@ -155,12 +157,13 @@ function extractTo(c) {
       process.exit(0);
     }
 
+    // Ensure campaign status is "running"
     if (campaign.status !== "running") {
       console.log(`[AUTO] Campaign status is ${campaign.status}. Exiting.`);
       process.exit(0);
     }
 
-    // runtime connected/disconnected accounts
+    // Step 3: Get connected accounts
     const accounts = loadAccountsConfig();
     const runtime = (await redisGetJSON(redis, "accounts:runtime")) || {};
     let connectedAccounts = accounts.filter((a) => runtime[String(a.id)]?.connected !== false);
@@ -171,7 +174,7 @@ function extractTo(c) {
     const total = campaign.contacts.length;
     let cursor = campaign.cursor || 0;
 
-    // Stats init
+    // Step 4: Initialize stats and events
     let stats = (await redisGetJSON(redis, statsKey)) || {
       campaignId: campaign.id,
       totalSent: 0,
@@ -179,7 +182,6 @@ function extractTo(c) {
       byAccount: {}
     };
 
-    // Events list
     let events = (await redisGetJSON(redis, eventsKey)) || [];
     if (!Array.isArray(events)) events = [];
 
@@ -193,7 +195,7 @@ function extractTo(c) {
       await redisSetJSON(redis, liveKey, { ...payload, updatedAt: Date.now() });
     }
 
-    // Completed?
+    // Step 5: Handle cursor and retry
     if (cursor >= total) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
@@ -212,14 +214,8 @@ function extractTo(c) {
       process.exit(0);
     }
 
-    // ---------
-    // Build global queue for this tick
-    // - first take from retry queue
-    // - then take fresh contacts from main list (cursor ..)
-    // Total capacity this tick = connectedAccounts * emailsPerAcc
-    // ---------
+    // Step 6: Build global queue
     const tickCapacity = connectedAccounts.length * emailsPerAcc;
-
     let retryQueue = (await redisGetJSON(redis, retryKey)) || [];
     if (!Array.isArray(retryQueue)) retryQueue = [];
 
@@ -230,7 +226,7 @@ function extractTo(c) {
     const fromMain = campaign.contacts.slice(cursor, Math.min(cursor + remainingCapacity, total));
     const takenFromMain = fromMain.length;
 
-    // Advance cursor ONLY for what we pulled from main
+    // Update campaign cursor
     campaign.cursor = cursor + takenFromMain;
     campaign.updatedAt = Date.now();
     await redisSetJSON(redis, campaignKey, campaign);
@@ -238,23 +234,19 @@ function extractTo(c) {
     // Save leftover retry back
     await redisSetJSON(redis, retryKey, retryQueue);
 
-    // Global queue: items we attempt to send this tick
+    // Global queue
     const queue = [...fromRetry, ...fromMain];
 
     console.log(`[AUTO] Tick capacity=${tickCapacity}, pulled retry=${fromRetry.length}, pulled main=${takenFromMain}`);
-    console.log(`[AUTO] Cursor advanced: ${cursor} -> ${campaign.cursor} (total=${total})`);
-    console.log(`[AUTO] Connected accounts now: ${connectedAccounts.length}, per account limit=${emailsPerAcc}`);
     console.log(`[AUTO] Queue size this tick: ${queue.length}`);
 
     if (queue.length === 0) {
-      // Nothing to do (maybe only retry left but was empty + no new)
       await setLive({ state: "idle_waiting_next_tick", currentEmail: null, currentAccountId: null, currentSenderName: null });
       console.log("[AUTO] Nothing queued this tick.");
       process.exit(0);
     }
 
-    // If an email can't be sent even after trying multiple accounts in same tick,
-    // we push it back for next tick:
+    // Main sending loop
     const carryOver = [];
 
     // Helper to init per-account stats
@@ -273,8 +265,7 @@ function extractTo(c) {
     }
 
     // ---------
-    // Main sending loop: account by account, max emailsPerAcc
-    // If account fails/quota -> disconnect and move on, WITHOUT popping queue item
+    // Main loop: attempt to send emails
     // ---------
     const results = [];
 
@@ -302,11 +293,10 @@ function extractTo(c) {
       for (let i = 0; i < emailsPerAcc; i++) {
         if (queue.length === 0) break;
 
-        const c = queue[0]; // IMPORTANT: don't shift until success/permanent-fail
+        const c = queue[0];
         const to = extractTo(c);
 
         if (!to) {
-          // permanent row issue -> drop it
           queue.shift();
           failed++;
           stats.totalFailed++;
@@ -348,7 +338,6 @@ function extractTo(c) {
             html
           });
 
-          // success -> pop from queue
           queue.shift();
 
           sent++;
@@ -370,15 +359,12 @@ function extractTo(c) {
         } catch (err) {
           const msg = err?.message || "Unknown error";
 
-          // If account-level failure -> disconnect this account and move to NEXT account
-          // IMPORTANT: do NOT pop queue[0] so next account will try SAME contact
           if (looksLikeAccountLevelFailure(err)) {
             runtime[idStr] = runtime[idStr] || {};
             runtime[idStr].connected = false;
             runtime[idStr].lastError = msg;
             await redisSetJSON(redis, "accounts:runtime", runtime);
 
-            // log event as failed attempt (but contact stays)
             failed++;
             stats.totalFailed++;
             stats.byAccount[idStr].failed++;
@@ -398,13 +384,11 @@ function extractTo(c) {
             console.log(`[AUTO] Account disabled due to failure: ${account.email} :: ${msg}`);
             errors.push({ email: to, error: msg });
 
-            break; // next account
+            break; // Next account
           }
 
-          // Permanent recipient problem -> drop this contact (do not retry with other account)
           if (looksLikePermanentRecipientFailure(err)) {
             queue.shift();
-
             failed++;
             stats.totalFailed++;
             stats.byAccount[idStr].failed++;
@@ -425,7 +409,7 @@ function extractTo(c) {
             continue;
           }
 
-          // Other transient error -> move contact to carryOver for next tick
+          // Other errors -> retry in next tick
           queue.shift();
           carryOver.push(c);
 
@@ -452,17 +436,14 @@ function extractTo(c) {
       results.push({ accountId: account.id, email: account.email, sent, failed, errors });
     }
 
-    // Anything still left in queue could not be sent within account limits this tick -> retry next hour
+    // Step 7: Handle retries for leftovers
     const leftovers = [...queue, ...carryOver];
 
     if (leftovers.length > 0) {
-      // merge with existing retry (prepend so they go next tick first)
       let existingRetry = (await redisGetJSON(redis, retryKey)) || [];
       if (!Array.isArray(existingRetry)) existingRetry = [];
 
       const merged = [...leftovers, ...existingRetry];
-
-      // cap retry size to prevent infinite growth
       const MAX_RETRY = 10000;
       await redisSetJSON(redis, retryKey, merged.slice(0, MAX_RETRY));
 
@@ -471,10 +452,7 @@ function extractTo(c) {
       console.log("[AUTO] No leftovers to retry.");
     }
 
-    // Completion check:
-    // Completed only if:
-    // 1) cursor reached end AND
-    // 2) retry queue is empty
+    // Step 8: Completion check
     const retryNow = (await redisGetJSON(redis, retryKey)) || [];
     const retryCount = Array.isArray(retryNow) ? retryNow.length : 0;
 
