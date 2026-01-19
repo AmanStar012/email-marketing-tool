@@ -11,8 +11,10 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repo (faiz branch)
         uses: actions/checkout@v4
+        with:
+          ref: faiz
 
       - name: Setup Node
         uses: actions/setup-node@v4
