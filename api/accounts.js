@@ -1,3 +1,4 @@
+// api/accounts.js
 const { cors, loadAccountsConfig, redisGet } = require("./_shared");
 
 module.exports = async function handler(req, res) {
@@ -14,7 +15,7 @@ module.exports = async function handler(req, res) {
         id: a.id,
         email: a.email,
         senderName: a.senderName,
-        connected: rt.connected === true, 
+        connected: rt.connected === true,
         lastError: rt.lastError || ""
       };
     });
