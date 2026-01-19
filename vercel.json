@@ -10,8 +10,7 @@
 
     "api/auto-start.js": { "maxDuration": 30, "memory": 1024 },
     "api/auto-stop.js": { "maxDuration": 15, "memory": 512 },
-    "api/auto-status.js": { "maxDuration": 15, "memory": 512 },
-    "api/auto-tick-runner.js": { "maxDuration": 300, "memory": 1024 }
+    "api/auto-status.js": { "maxDuration": 15, "memory": 512 }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
