@@ -8,7 +8,7 @@ const {
   redisGet,
   redisSet,
   redisDel
-} = require("./_shared");
+} = require("../api/_shared");
 
 module.exports = async function handler(req, res) {
   cors(res);
