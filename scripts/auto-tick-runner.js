@@ -1,6 +1,5 @@
 const {
-  cors,
-  sleep,
+  cors,sleep,
   convertTextToHTML,
   createTransporter,
   looksLikeAccountLevelFailure,
