@@ -7,7 +7,6 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-// CORS handler
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -31,7 +30,7 @@ function loadAccountsConfig() {
   let accounts;
   try {
     accounts = JSON.parse(raw);
-  } catch (e) {
+  } catch {
     throw new Error("accounts.json is not valid JSON");
   }
 
@@ -56,9 +55,9 @@ function loadAccountsConfig() {
   });
 }
 
-// Merge helper function
+// Merge helper
 function applyMerge(text, vars = {}) {
-  if (!text || typeof text !== "string") return text || "";
+  if (!text || typeof text !== "string") return "";
   let out = text;
 
   for (const [k, v] of Object.entries(vars)) {
@@ -66,9 +65,7 @@ function applyMerge(text, vars = {}) {
     out = out.replace(re, v == null ? "" : String(v));
   }
 
-  // remove any leftover {{...}}
-  out = out.replace(/{{[^}]*}}/g, "");
-  return out;
+  return out.replace(/{{[^}]*}}/g, "");
 }
 
 function escapeRegExp(s) {
@@ -88,7 +85,7 @@ function convertTextToHTML(text) {
     .replace(/$/, "</div>");
 }
 
-// Nodemailer transporter creation
+// Nodemailer transporter
 function createTransporter(account) {
   const user = (account.email || "").trim();
   const pass = (account.pass || "").trim();
@@ -97,29 +94,42 @@ function createTransporter(account) {
     throw new Error(`Missing email/pass for account id=${account.id}`);
   }
 
-  // Gmail SMTP
   return nodemailer.createTransport({
     service: "gmail",
     auth: { user, pass }
   });
 }
 
-// Redis client setup
+// 🔴 THIS WAS MISSING — ROOT CAUSE FIX
+function looksLikeAccountLevelFailure(err) {
+  if (!err) return false;
+  const msg = String(err.message || err).toLowerCase();
+
+  return (
+    msg.includes("invalid login") ||
+    msg.includes("authentication failed") ||
+    msg.includes("bad credentials") ||
+    msg.includes("username and password not accepted") ||
+    msg.includes("account disabled") ||
+    msg.includes("not authorized") ||
+    msg.includes("smtp authentication") ||
+    msg.includes("login not allowed")
+  );
+}
+
+// Redis
 let _redisClient = null;
 let _redisConnecting = null;
 
 async function getRedisClient() {
   if (_redisClient) return _redisClient;
-
   if (_redisConnecting) {
     await _redisConnecting;
     return _redisClient;
   }
 
   const url = process.env.REDIS_URL;
-  if (!url) {
-    throw new Error("Missing REDIS_URL env var");
-  }
+  if (!url) throw new Error("Missing REDIS_URL env var");
 
   _redisClient = createClient({ url });
 
@@ -138,8 +148,6 @@ async function redisGet(key) {
   const client = await getRedisClient();
   const raw = await client.get(key);
   if (raw == null) return null;
-
-  // try parse JSON
   try {
     return JSON.parse(raw);
   } catch {
@@ -151,13 +159,11 @@ async function redisSet(key, value) {
   const client = await getRedisClient();
   const v = typeof value === "string" ? value : JSON.stringify(value);
   await client.set(key, v);
-  return true;
 }
 
 async function redisDel(key) {
   const client = await getRedisClient();
   await client.del(key);
-  return true;
 }
 
 module.exports = {
@@ -165,6 +171,7 @@ module.exports = {
   sleep,
   convertTextToHTML,
   createTransporter,
+  looksLikeAccountLevelFailure,
   applyMerge,
   loadAccountsConfig,
   redisGet,
