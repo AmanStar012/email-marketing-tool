@@ -1,12 +1,3 @@
-/**
- * AUTO TICK RUNNER (CRON)
- * - Parallel sending from all connected accounts
- * - 1 second delay per account
- * - 40 emails per account per tick
- * - Retry FAILED emails exactly ONCE
- * - Disconnect account on account-level failure
- */
-
 const {
   sleep,
   convertTextToHTML,
