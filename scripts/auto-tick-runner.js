@@ -1,5 +1,14 @@
+/**
+ * AUTO TICK RUNNER (CRON)
+ * - Parallel sending from all connected accounts
+ * - 1 second delay per account
+ * - 40 emails per account per tick
+ * - Retry FAILED emails exactly ONCE
+ * - Disconnect account on account-level failure
+ */
+
 const {
-  cors,sleep,
+  sleep,
   convertTextToHTML,
   createTransporter,
   looksLikeAccountLevelFailure,
@@ -8,221 +17,197 @@ const {
   redisGet,
   redisSet,
   redisDel
-} = require("../api/_shared");
+} = require("../api/_shared"); // IMPORTANT PATH
 
-module.exports = async function handler(req, res) {
-  cors(res);
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST")
-    return res.status(405).json({ success: false, error: "Method not allowed" });
+const EMAILS_PER_ACCOUNT = 40;
+const PER_EMAIL_DELAY_MS = 1000;
+const MAX_RETRY = 1;
 
+(async function runAutoTick() {
   try {
+    console.log("⏱️ Auto Tick Runner started");
+
     const activeId = await redisGet("auto:campaign:active");
-    if (!activeId)
-      return res.status(200).json({ success: true, message: "No active campaign" });
+    if (!activeId) {
+      console.log("ℹ️ No active campaign");
+      process.exit(0);
+    }
 
     const campaignKey = `auto:campaign:${activeId}`;
-    const liveKey = `auto:campaign:${activeId}:live`;
+    const retryKey = `auto:campaign:${activeId}:retry`;
     const statsKey = `auto:campaign:${activeId}:stats`;
     const eventsKey = `auto:campaign:${activeId}:events`;
 
     const campaign = await redisGet(campaignKey);
     if (!campaign || campaign.status !== "running") {
-      return res.status(200).json({ success: true, message: "Campaign not running" });
+      console.log("ℹ️ Campaign not running");
+      process.exit(0);
     }
 
-    const accounts = loadAccountsConfig();
     const runtime = (await redisGet("accounts:runtime")) || {};
+    const accounts = loadAccountsConfig();
 
     const connectedAccounts = accounts.filter(
-      (a) => runtime[String(a.id)]?.connected !== false
+      a => runtime[String(a.id)]?.connected !== false
     );
 
     if (connectedAccounts.length === 0) {
-      await redisSet(liveKey, {
-        state: "no_connected_accounts",
-        updatedAt: Date.now()
-      });
-      return res.status(200).json({ success: true, message: "No connected accounts" });
+      console.log("❌ No connected accounts");
+      process.exit(0);
     }
 
-    const emailsPerAccount = Number(campaign.emailsPerAccountPerHour || 40);
-    const delayMs = Number(campaign.perEmailDelayMs || 1000);
-
-    const retryQueueKey = `auto:campaign:${activeId}:retry`;
-    const retryQueue = (await redisGet(retryQueueKey)) || [];
-
+    // Load retry queue first
+    let retryQueue = (await redisGet(retryKey)) || [];
     let cursor = campaign.cursor || 0;
-    const totalContacts = campaign.contacts.length;
+    const contacts = campaign.contacts;
+    const total = contacts.length;
 
-    // 🔁 Build work pool (retry first)
-    const workPool = [...retryQueue];
-    const freshContacts = campaign.contacts.slice(cursor);
-    workPool.push(...freshContacts);
+    // Prepare per-account job queues
+    const jobs = connectedAccounts.map(acc => ({
+      account: acc,
+      queue: []
+    }));
 
-    const assignedMap = new Map();
-    let poolIndex = 0;
-
-    // 📦 Assign emails per account
-    for (const acc of connectedAccounts) {
-      assignedMap.set(acc.id, []);
-      for (let i = 0; i < emailsPerAccount; i++) {
-        if (poolIndex >= workPool.length) break;
-        assignedMap.get(acc.id).push(workPool[poolIndex]);
-        poolIndex++;
+    // 1️⃣ Fill from retry queue FIRST
+    for (const job of jobs) {
+      while (job.queue.length < EMAILS_PER_ACCOUNT && retryQueue.length > 0) {
+        job.queue.push(retryQueue.shift());
       }
     }
 
-    const assignedCount = poolIndex;
-    campaign.cursor = cursor + Math.max(0, assignedCount - retryQueue.length);
-    campaign.updatedAt = Date.now();
-
-    // Clear retry queue now (failed will re-add)
-    await redisSet(retryQueueKey, []);
-    await redisSet(campaignKey, campaign);
-
-    // 🧵 Parallel send per account
-    const sendForAccount = async (account, contacts) => {
-      const accId = String(account.id);
-      const transporter = createTransporter(account);
-      let sent = 0;
-      let failed = 0;
-      const failedContacts = [];
-
-      for (const c of contacts) {
-        const to = c.email || c.Email || c["Email Address"];
-        if (!to) {
-          failed++;
-          continue;
-        }
-
-        try {
-          const vars = {
-            ...c,
-            brandName: campaign.brandName,
-            senderName: account.senderName
-          };
-
-          const subject = applyMerge(campaign.template.subject, vars);
-          const bodyText = applyMerge(campaign.template.content, vars);
-          const html = convertTextToHTML(bodyText);
-
-          await transporter.sendMail({
-            from: `${account.senderName || ""} <${account.email}>`,
-            to,
-            subject,
-            html
-          });
-
-          sent++;
-
-          await pushEvent(eventsKey, {
-            ts: Date.now(),
-            status: "sent",
-            from: account.email,
-            to
-          });
-
-          await sleep(delayMs);
-        } catch (err) {
-          failed++;
-          failedContacts.push(c);
-
-          await pushEvent(eventsKey, {
-            ts: Date.now(),
-            status: "failed",
-            from: account.email,
-            to,
-            error: err.message
-          });
-
-          if (looksLikeAccountLevelFailure(err)) {
-            runtime[accId] = runtime[accId] || {};
-            runtime[accId].connected = false;
-            runtime[accId].lastError = err.message;
-            await redisSet("accounts:runtime", runtime);
-            break;
-          }
-        }
+    // 2️⃣ Fill from main contacts list
+    for (const job of jobs) {
+      while (job.queue.length < EMAILS_PER_ACCOUNT && cursor < total) {
+        job.queue.push({
+          contact: contacts[cursor],
+          retry: 0
+        });
+        cursor++;
       }
+    }
 
-      return { accountId: account.id, email: account.email, sent, failed, failedContacts };
+    // Save updated retry queue + cursor EARLY (safe now)
+    campaign.cursor = cursor;
+    campaign.updatedAt = Date.now();
+    await redisSet(campaignKey, campaign);
+    await redisSet(retryKey, retryQueue);
+
+    // Init stats
+    const stats = (await redisGet(statsKey)) || {
+      totalSent: 0,
+      totalFailed: 0,
+      byAccount: {}
     };
 
-    const results = await Promise.all(
-      connectedAccounts.map((acc) =>
-        sendForAccount(acc, assignedMap.get(acc.id) || [])
-      )
+    // 🔁 Send in PARALLEL
+    await Promise.all(
+      jobs.map(async ({ account, queue }) => {
+        if (queue.length === 0) return;
+
+        const accId = String(account.id);
+        stats.byAccount[accId] ||= {
+          email: account.email,
+          senderName: account.senderName,
+          sent: 0,
+          failed: 0,
+          lastSentAt: null
+        };
+
+        let transporter = createTransporter(account);
+
+        for (const item of queue) {
+          const { contact, retry } = item;
+          const to = contact.email;
+          if (!to) continue;
+
+          try {
+            const vars = {
+              ...contact,
+              brandName: campaign.brandName,
+              senderName: account.senderName
+            };
+
+            const subject = applyMerge(campaign.template.subject, vars);
+            const body = applyMerge(campaign.template.content, vars);
+            const html = convertTextToHTML(body);
+
+            await transporter.sendMail({
+              from: `"${account.senderName}" <${account.email}>`,
+              to,
+              subject,
+              html
+            });
+
+            stats.totalSent++;
+            stats.byAccount[accId].sent++;
+            stats.byAccount[accId].lastSentAt = Date.now();
+
+            await redisSet(eventsKey, [
+              ...(await redisGet(eventsKey) || []),
+              { ts: Date.now(), status: "sent", from: account.email, to }
+            ]);
+
+            await sleep(PER_EMAIL_DELAY_MS);
+
+          } catch (err) {
+            stats.totalFailed++;
+            stats.byAccount[accId].failed++;
+
+            // Account-level failure → DISCONNECT
+            if (looksLikeAccountLevelFailure(err)) {
+              runtime[accId] = runtime[accId] || {};
+              runtime[accId].connected = false;
+              runtime[accId].lastError = err.message;
+              await redisSet("accounts:runtime", runtime);
+              console.error(`❌ Account disabled: ${account.email}`);
+              break;
+            }
+
+            // Retry ONLY ONCE
+            if (retry < MAX_RETRY) {
+              retryQueue.push({ contact, retry: retry + 1 });
+            }
+
+            await redisSet(eventsKey, [
+              ...(await redisGet(eventsKey) || []),
+              {
+                ts: Date.now(),
+                status: "failed",
+                from: account.email,
+                to,
+                error: err.message
+              }
+            ]);
+          }
+        }
+      })
     );
 
-    // 🔁 Requeue failed emails
-    const requeue = results.flatMap((r) => r.failedContacts || []);
-    if (requeue.length) {
-      await redisSet(retryQueueKey, requeue);
-    }
-
-    // 🧮 Stats
-    const stats = (await redisGet(statsKey)) || { totalSent: 0, totalFailed: 0, byAccount: {} };
-
-    for (const r of results) {
-      stats.totalSent += r.sent;
-      stats.totalFailed += r.failed;
-      stats.byAccount[r.accountId] = stats.byAccount[r.accountId] || {
-        email: r.email,
-        sent: 0,
-        failed: 0,
-        lastSentAt: null
-      };
-      stats.byAccount[r.accountId].sent += r.sent;
-      stats.byAccount[r.accountId].failed += r.failed;
-      stats.byAccount[r.accountId].lastSentAt = Date.now();
-    }
-
+    // Save retry queue + stats
+    await redisSet(retryKey, retryQueue);
     await redisSet(statsKey, stats);
 
-    // 🏁 Completion check
-    if (
-      campaign.cursor >= totalContacts &&
-      (await redisGet(retryQueueKey)).length === 0
-    ) {
+    // Campaign completion check
+    if (campaign.cursor >= total && retryQueue.length === 0) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
       await redisSet(campaignKey, campaign);
       await redisDel("auto:campaign:active");
 
-      await redisSet(liveKey, {
-        state: "completed",
-        updatedAt: Date.now()
-      });
+      await redisSet(eventsKey, [
+        ...(await redisGet(eventsKey) || []),
+        { ts: Date.now(), status: "campaign_completed", campaignId: campaign.id }
+      ]);
 
-      await pushEvent(eventsKey, {
-        ts: Date.now(),
-        status: "campaign_completed",
-        campaignId: campaign.id
-      });
+      console.log("🏁 Campaign completed");
     } else {
-      await redisSet(liveKey, {
-        state: "idle_waiting_next_tick",
-        updatedAt: Date.now()
-      });
+      console.log("⏳ Tick complete, waiting for next run");
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Auto tick completed",
-      assigned: assignedCount,
-      retryQueued: requeue.length
-    });
-  } catch (e) {
-    return res.status(500).json({ success: false, error: e.message });
-  }
-};
+    process.exit(0);
 
-// helpers
-async function pushEvent(key, ev) {
-  let events = (await redisGet(key)) || [];
-  if (!Array.isArray(events)) events = [];
-  events.push(ev);
-  if (events.length > 500) events = events.slice(-500);
-  await redisSet(key, events);
-}
+  } catch (err) {
+    console.error("🔥 Auto Tick Runner crashed:", err);
+    process.exit(1);
+  }
+})();
