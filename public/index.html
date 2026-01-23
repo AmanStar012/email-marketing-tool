@@ -1277,55 +1277,49 @@
     }
 
     // AUTO Campaign
-    async function startAutoCampaign() {
-      if (state.contacts.length === 0) return log('Upload contacts first', 'error');
+async function startAutoCampaign() {
+  
+  if (!Array.isArray(state.contacts) || state.contacts.length === 0) {
+    log('Upload CSV first', 'error');
+    return;
+  }
 
-      const brandRaw = document.getElementById('brandName').value.trim();
-      const subjectRaw = document.getElementById('subjectLine').value;
-      const contentRaw = document.getElementById('emailContent').value;
+  const brandRaw = document.getElementById('brandName')?.value || '';
+  const subjectRaw = document.getElementById('subjectLine')?.value || '';
+  const contentRaw = document.getElementById('emailContent')?.value || '';
 
-      const brands = brandRaw
-        ? brandRaw.split('\n').map(b => b.trim()).filter(Boolean)
-        : [];
+  const brands = brandRaw.split('\n').map(v => v.trim()).filter(Boolean);
+  const subjects = subjectRaw.split('\n').map(v => v.trim()).filter(Boolean);
+  const bodies = contentRaw.split('---').map(v => v.trim()).filter(Boolean);
 
-      const subjects = subjectRaw
-        ? subjectRaw.split('\n').map(s => s.trim()).filter(Boolean)
-        : [];
+  if (!brands.length || !subjects.length || !bodies.length) {
+    log('Brand, subject, and body are required', 'error');
+    return;
+  }
 
-      const bodies = contentRaw
-        ? contentRaw.split('---').map(b => b.trim()).filter(Boolean)
-        : [];
+  const contacts = state.contacts.map(c => normalizeContactEmailKey(c));
 
-      if (!brands.length) return log('Brand name is required', 'error');
-      if (!subjects.length) return log('At least one subject is required', 'error');
-      if (!bodies.length) return log('Email content is required', 'error');
-
-
-      if (!brandName) return log('Brand Name is required for auto campaign', 'error');
-      if (!subject || !content) return log('Fill subject and body', 'error');
-
-      try {
-        saveTemplateToLocalStorage();
-        const normalizedContacts = state.contacts.map(c => normalizeContactEmailKey(c));
-
-        const payload = {
-          contacts: normalizedContacts,
-          brandName: brands,
-          template: {
-            subject: subjects,
-            content: bodies
-          }
-        };
-
-        const r = await emailAPI.autoStart(payload);
-
-        state.autoCampaignId = r.campaignId;
-        log(`⏱️ Auto campaign started: ${r.campaignId}`, 'success');
-        await refreshAutoStatus();
-      } catch (e) {
-        log(`Auto start failed: ${e.message}`, 'error');
-      }
+  const payload = {
+    contacts,
+    brandName: brands,
+    template: {
+      subject: subjects,
+      content: bodies
     }
+  };
+
+  console.log("AUTO CAMPAIGN PAYLOAD:", payload);
+
+  // 7️⃣ Send to backend
+  try {
+    const r = await emailAPI.autoStart(payload);
+    log(`Auto campaign started: ${r.campaignId}`, 'success');
+    await refreshAutoStatus();
+  } catch (e) {
+    log(`Auto start failed: ${e.message}`, 'error');
+  }
+}
+
 
     async function stopAutoCampaign() {
       try {
