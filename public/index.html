@@ -1284,13 +1284,22 @@
       const subjectRaw = document.getElementById('subjectLine').value;
       const contentRaw = document.getElementById('emailContent').value;
 
-      const brands = brandRaw.split('\n').map(b => b.trim()).filter(Boolean);
-      const subjects = subjectRaw.split('\n').map(s => s.trim()).filter(Boolean);
-      const bodies = contentRaw.split('---').map(b => b.trim()).filter(Boolean);
+      const brands = brandRaw
+        ? brandRaw.split('\n').map(b => b.trim()).filter(Boolean)
+        : [];
 
-      if (brands.length === 0 || subjects.length === 0 || bodies.length === 0) {
-        return log('Please enter multiple brands, subjects, and bodies', 'error');
-      }
+      const subjects = subjectRaw
+        ? subjectRaw.split('\n').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const bodies = contentRaw
+        ? contentRaw.split('---').map(b => b.trim()).filter(Boolean)
+        : [];
+
+      if (!brands.length) return log('Brand name is required', 'error');
+      if (!subjects.length) return log('At least one subject is required', 'error');
+      if (!bodies.length) return log('Email content is required', 'error');
+
 
       if (!brandName) return log('Brand Name is required for auto campaign', 'error');
       if (!subject || !content) return log('Fill subject and body', 'error');
