@@ -1289,9 +1289,17 @@
     async function startAutoCampaign() {
       if (state.contacts.length === 0) return log('Upload contacts first', 'error');
 
-      const brandName = document.getElementById('brandName').value.trim();
-      const subject = document.getElementById('subjectLine').value;
-      const content = document.getElementById('emailContent').value;
+      const brandRaw = document.getElementById('brandName').value.trim();
+      const subjectRaw = document.getElementById('subjectLine').value;
+      const contentRaw = document.getElementById('emailContent').value;
+
+      const brands = brandRaw.split('\n').map(b => b.trim()).filter(Boolean);
+      const subjects = subjectRaw.split('\n').map(s => s.trim()).filter(Boolean);
+      const bodies = contentRaw.split('---').map(b => b.trim()).filter(Boolean);
+
+      if (brands.length === 0 || subjects.length === 0 || bodies.length === 0) {
+        return log('Please enter multiple brands, subjects, and bodies', 'error');
+      }
 
       if (!brandName) return log('Brand Name is required for auto campaign', 'error');
       if (!subject || !content) return log('Fill subject and body', 'error');
@@ -1300,7 +1308,15 @@
         saveTemplateToLocalStorage();
         const normalizedContacts = state.contacts.map(c => normalizeContactEmailKey(c));
 
-        const payload = { contacts: normalizedContacts, brandName, template: { subject, content } };
+        const payload = {
+          contacts: normalizedContacts,
+          brandName: brands,
+          template: {
+            subject: subjects,
+            content: bodies
+          }
+        };
+
         const r = await emailAPI.autoStart(payload);
 
         state.autoCampaignId = r.campaignId;
