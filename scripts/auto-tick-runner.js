@@ -2,6 +2,7 @@ const {
   sleep,
   convertTextToHTML,
   createTransporter,
+  looksLikeAccountLevelFailure,
   applyMerge,
   loadAccountsConfig,
   redisGet,
@@ -9,29 +10,9 @@ const {
   redisDel
 } = require("../api/_shared");
 
-const EMAILS_PER_ACCOUNT = 30;
+const EMAILS_PER_ACCOUNT = 40;
 const PER_EMAIL_DELAY_MS = 1000;
 const MAX_RETRY = 1;
-const DAILY_CAP = 1000;
-
-// ---------- helpers ----------
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-}
-
-function isAccountLevelFailure(err) {
-  const msg = String(err?.message || "").toLowerCase();
-  return (
-    msg.includes("daily user sending limit") ||
-    msg.includes("username and password not accepted") ||
-    msg.includes("invalid login") ||
-    msg.includes("account has been disabled") ||
-    msg.includes("too many login attempts")
-  );
-}
-
-// ---------- main ----------
 
 (async function runAutoTick() {
   try {
@@ -57,33 +38,12 @@ function isAccountLevelFailure(err) {
     const runtime = (await redisGet("accounts:runtime")) || {};
     const accounts = loadAccountsConfig();
 
-    // 🔒 filter connected + under daily cap
-    const connectedAccounts = [];
-
-    for (const acc of accounts) {
-      const accId = String(acc.id);
-      if (runtime[accId]?.connected === false) continue;
-
-      const dailyKey = `account:daily:${accId}`;
-      const daily = (await redisGet(dailyKey)) || { sent: 0, day: todayKey() };
-
-      // reset if day changed
-      if (daily.day !== todayKey()) {
-        await redisSet(dailyKey, { sent: 0, day: todayKey() });
-        connectedAccounts.push(acc);
-        continue;
-      }
-
-      if (daily.sent >= DAILY_CAP) {
-        console.log(`⏸️ Daily cap reached: ${acc.email}`);
-        continue;
-      }
-
-      connectedAccounts.push(acc);
-    }
+    const connectedAccounts = accounts.filter(
+      (a) => runtime[String(a.id)]?.connected !== false
+    );
 
     if (connectedAccounts.length === 0) {
-      console.log("❌ No eligible accounts (daily cap / disconnected)");
+      console.log("❌ No connected accounts");
       process.exit(0);
     }
 
@@ -92,20 +52,19 @@ function isAccountLevelFailure(err) {
     const contacts = campaign.contacts;
     const total = contacts.length;
 
-    // Prepare jobs
-    const jobs = connectedAccounts.map(acc => ({
+    const jobs = connectedAccounts.map((acc) => ({
       account: acc,
       queue: []
     }));
 
-    // 1️⃣ retry first
+    // 1️⃣ Retry first
     for (const job of jobs) {
       while (job.queue.length < EMAILS_PER_ACCOUNT && retryQueue.length > 0) {
         job.queue.push(retryQueue.shift());
       }
     }
 
-    // 2️⃣ fresh
+    // 2️⃣ New contacts
     for (const job of jobs) {
       while (job.queue.length < EMAILS_PER_ACCOUNT && cursor < total) {
         job.queue.push({ contact: contacts[cursor], retry: 0 });
@@ -113,7 +72,6 @@ function isAccountLevelFailure(err) {
       }
     }
 
-    // save cursor early
     campaign.cursor = cursor;
     campaign.updatedAt = Date.now();
     await redisSet(campaignKey, campaign);
@@ -121,19 +79,15 @@ function isAccountLevelFailure(err) {
 
     const stats = (await redisGet(statsKey)) || {
       totalSent: 0,
-      failed: 0,
+      totalFailed: 0,
       byAccount: {}
     };
 
-    // 🚀 PARALLEL SEND
     await Promise.all(
       jobs.map(async ({ account, queue }) => {
-        if (queue.length === 0) return;
+        if (!queue.length) return;
 
         const accId = String(account.id);
-        const dailyKey = `account:daily:${accId}`;
-        let daily = (await redisGet(dailyKey)) || { sent: 0, day: todayKey() };
-
         stats.byAccount[accId] ||= {
           email: account.email,
           senderName: account.senderName,
@@ -142,11 +96,9 @@ function isAccountLevelFailure(err) {
           lastSentAt: null
         };
 
-        const transporter = createTransporter(account);
+        let transporter = createTransporter(account);
 
         for (const item of queue) {
-          if (daily.sent >= DAILY_CAP) break;
-
           const { contact, retry } = item;
           const to = contact.email;
           if (!to) continue;
@@ -169,41 +121,40 @@ function isAccountLevelFailure(err) {
               html
             });
 
-            // success
-            daily.sent++;
-            await redisSet(dailyKey, daily);
-
             stats.totalSent++;
             stats.byAccount[accId].sent++;
             stats.byAccount[accId].lastSentAt = Date.now();
 
-            if (retry > 0) stats.failed = Math.max(0, stats.failed - 1);
-
-            await redisSet(eventsKey, [
-              ...(await redisGet(eventsKey) || []),
-              { ts: Date.now(), status: "sent", from: account.email, to }
-            ]);
+            const ev = (await redisGet(eventsKey)) || [];
+            ev.push({ ts: Date.now(), status: "sent", from: account.email, to });
+            await redisSet(eventsKey, ev.slice(-300));
 
             await sleep(PER_EMAIL_DELAY_MS);
 
           } catch (err) {
-            if (isAccountLevelFailure(err)) {
+            stats.totalFailed++;
+            stats.byAccount[accId].failed++;
+
+            if (looksLikeAccountLevelFailure(err)) {
               runtime[accId] = { connected: false, lastError: err.message };
               await redisSet("accounts:runtime", runtime);
+              console.error(`❌ Account disabled: ${account.email}`);
               break;
             }
 
             if (retry < MAX_RETRY) {
               retryQueue.push({ contact, retry: retry + 1 });
-              stats.failed++;
             }
 
-            stats.byAccount[accId].failed++;
-
-            await redisSet(eventsKey, [
-              ...(await redisGet(eventsKey) || []),
-              { ts: Date.now(), status: "failed", from: account.email, to, error: err.message }
-            ]);
+            const ev = (await redisGet(eventsKey)) || [];
+            ev.push({
+              ts: Date.now(),
+              status: "failed",
+              from: account.email,
+              to,
+              error: err.message
+            });
+            await redisSet(eventsKey, ev.slice(-300));
           }
         }
       })
@@ -218,14 +169,13 @@ function isAccountLevelFailure(err) {
       await redisSet(campaignKey, campaign);
       await redisDel("auto:campaign:active");
 
-      await redisSet(eventsKey, [
-        ...(await redisGet(eventsKey) || []),
-        { ts: Date.now(), status: "campaign_completed", campaignId: campaign.id }
-      ]);
+      const ev = (await redisGet(eventsKey)) || [];
+      ev.push({ ts: Date.now(), status: "campaign_completed", campaignId: campaign.id });
+      await redisSet(eventsKey, ev.slice(-300));
 
       console.log("🏁 Campaign completed");
     } else {
-      console.log("⏳ Tick complete → waiting next run");
+      console.log("⏳ Tick complete, waiting next run");
     }
 
     process.exit(0);

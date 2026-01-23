@@ -3,35 +3,20 @@ const { cors, redisGet, redisSet } = require("./_shared");
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") {
+  if (req.method !== "POST")
     return res.status(405).json({ success: false, error: "Method not allowed" });
-  }
 
   try {
+    const { contacts, brandName, template } = req.body || {};
     const now = Date.now();
 
-    /**
-     * EXPECTED PAYLOAD SHAPE (NEW)
-     * {
-     *   contacts: [...],
-     *   brands: ["Brand A", "Brand B", "Brand C"],
-     *   templates: {
-     *     subjects: ["...", "...", "..."],
-     *     bodies: ["...", "...", "..."]
-     *   }
-     * }
-     */
-    const { contacts, brands, templates } = req.body || {};
-
-    /* =====================================================
-       🔁 RESUME LOGIC (UNCHANGED)
-    ===================================================== */
-
+    // 🔍 Check last campaign
     const lastId = await redisGet("auto:campaign:last");
 
     if (lastId) {
       const lastCampaign = await redisGet(`auto:campaign:${lastId}`);
 
+      // 🔁 RESUME logic
       if (lastCampaign && lastCampaign.status === "stopped") {
         lastCampaign.status = "running";
         lastCampaign.updatedAt = now;
@@ -39,6 +24,7 @@ module.exports = async function handler(req, res) {
         await redisSet(`auto:campaign:${lastId}`, lastCampaign);
         await redisSet("auto:campaign:active", lastId);
 
+        // Update live state
         await redisSet(`auto:campaign:${lastId}:live`, {
           currentAccountId: null,
           currentEmail: null,
@@ -47,13 +33,10 @@ module.exports = async function handler(req, res) {
           updatedAt: now
         });
 
+        // Push resume event
         const eventsKey = `auto:campaign:${lastId}:events`;
         const events = (await redisGet(eventsKey)) || [];
-        events.push({
-          ts: now,
-          status: "campaign_resumed",
-          campaignId: lastId
-        });
+        events.push({ ts: now, status: "campaign_resumed", campaignId: lastId });
         await redisSet(eventsKey, events.slice(-300));
 
         return res.status(200).json({
@@ -64,62 +47,30 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    /* =====================================================
-       🆕 NEW CAMPAIGN VALIDATION
-    ===================================================== */
-
+    // 🆕 No stopped campaign → create NEW
     if (!Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ success: false, error: "contacts array is required" });
+    }
+    if (!brandName) return res.status(400).json({ success: false, error: "brandName is required" });
+    if (!template?.subject || !template?.content) {
       return res.status(400).json({
         success: false,
-        error: "contacts array is required"
+        error: "template.subject + template.content are required"
       });
     }
-
-    if (!Array.isArray(brands) || brands.length < 1) {
-      return res.status(400).json({
-        success: false,
-        error: "brands array is required"
-      });
-    }
-
-    if (
-      !templates ||
-      !Array.isArray(templates.subjects) ||
-      templates.subjects.length < 1 ||
-      !Array.isArray(templates.bodies) ||
-      templates.bodies.length < 1
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: "templates.subjects and templates.bodies arrays are required"
-      });
-    }
-
-    /* =====================================================
-       🆕 CREATE NEW CAMPAIGN
-    ===================================================== */
 
     const campaignId = `c_${Date.now()}`;
 
     const campaign = {
       id: campaignId,
       status: "running",
-
-      // NEW STRUCTURE
-      brands,                  // [ "Brand1", "Brand2", "Brand3" ]
-      templates: {
-        subjects: templates.subjects, // 5 subjects
-        bodies: templates.bodies      // 5 bodies
-      },
-
+      brandName,
+      template,
       contacts,
       cursor: 0,
       total: contacts.length,
-
-      // timing (informational only now)
-      emailsPerAccountPerHour: 30,
-      perEmailDelayMs: 60_000,
-
+      emailsPerAccountPerHour: 40,
+      perEmailDelayMs: 1000,
       createdAt: now,
       updatedAt: now
     };
@@ -144,12 +95,7 @@ module.exports = async function handler(req, res) {
     });
 
     await redisSet(`auto:campaign:${campaignId}:events`, [
-      {
-        ts: now,
-        status: "campaign_started",
-        campaignId,
-        total: contacts.length
-      }
+      { ts: now, status: "campaign_started", campaignId, brandName, total: contacts.length }
     ]);
 
     return res.status(200).json({
@@ -159,9 +105,6 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (e) {
-    return res.status(500).json({
-      success: false,
-      error: e.message
-    });
+    return res.status(500).json({ success: false, error: e.message });
   }
 };

@@ -770,11 +770,17 @@
             <div class="auto-row">
               <button class="btn btn-success" id="autoStartBtn">⏱️ Start Auto Campaign</button>
               <button class="btn btn-danger" id="autoStopBtn">🛑 Stop Auto Campaign</button>
+              <button class="btn btn-small btn-secondary" id="autoRefreshBtn">🔄 Refresh Auto Status</button>
             </div>
 
             <div class="auto-status" id="autoStatusBox">Auto Status: (loading...)</div>
 
             <div class="auto-panels">
+              <div class="auto-panel">
+                <h4>📨 Current Sender (Live)</h4>
+                <div id="autoLiveBox" class="mini">—</div>
+              </div>
+
               <div class="auto-panel">
                 <h4>📊 Per-Account Stats</h4>
                 <div class="table-wrap">
@@ -1279,77 +1285,31 @@
       }
     }
 
-    // Brands: comma-separated
-    function parseBrands(raw) {
-      return raw
-        .split(",")
-        .map(b => b.trim())
-        .filter(Boolean);
-    }
-
-    // Subjects: newline separated
-    function parseSubjects(raw) {
-      return raw
-        .split("\n")
-        .map(s => s.trim())
-        .filter(Boolean);
-    }
-
-    // Bodies: separated by ---
-    function parseBodies(raw) {
-      return raw
-        .split("\n---\n")
-        .map(b => b.trim())
-        .filter(Boolean);
-    }
-
+    // AUTO Campaign
     async function startAutoCampaign() {
-      if (state.contacts.length === 0) {
-        return log('Upload contacts first', 'error');
-      }
+      if (state.contacts.length === 0) return log('Upload contacts first', 'error');
 
-      const brandInput = document.getElementById('brandName').value;
-      const subjectInput = document.getElementById('subjectLine').value;
-      const bodyInput = document.getElementById('emailContent').value;
+      const brandName = document.getElementById('brandName').value.trim();
+      const subject = document.getElementById('subjectLine').value;
+      const content = document.getElementById('emailContent').value;
 
-      const brands = parseBrands(brandInput);
-      const subjects = parseSubjects(subjectInput);
-      const bodies = parseBodies(bodyInput);
-
-      if (brands.length === 0) {
-        return log('Enter at least 1 brand (comma separated)', 'error');
-      }
-      if (subjects.length === 0) {
-        return log('Enter at least 1 subject (newline separated)', 'error');
-      }
-      if (bodies.length === 0) {
-        return log('Enter at least 1 email body (use --- separator)', 'error');
-      }
+      if (!brandName) return log('Brand Name is required for auto campaign', 'error');
+      if (!subject || !content) return log('Fill subject and body', 'error');
 
       try {
-        const normalizedContacts =
-          state.contacts.map(c => normalizeContactEmailKey(c));
+        saveTemplateToLocalStorage();
+        const normalizedContacts = state.contacts.map(c => normalizeContactEmailKey(c));
 
-        const payload = {
-          contacts: normalizedContacts,
-          brands,
-          templates: {
-            subjects,
-            bodies
-          }
-        };
+        const payload = { contacts: normalizedContacts, brandName, template: { subject, content } };
+        const r = await emailAPI.autoStart(payload);
 
-        const res = await emailAPI.autoStart(payload);
-        state.autoCampaignId = res.campaignId;
-
-        log(`⏱️ Auto campaign started: ${res.campaignId}`, 'success');
+        state.autoCampaignId = r.campaignId;
+        log(`⏱️ Auto campaign started: ${r.campaignId}`, 'success');
         await refreshAutoStatus();
-
       } catch (e) {
         log(`Auto start failed: ${e.message}`, 'error');
       }
     }
-
 
     async function stopAutoCampaign() {
       try {
