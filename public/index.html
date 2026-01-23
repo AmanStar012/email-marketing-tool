@@ -736,24 +736,15 @@
         <div class="section">
           <div class="section-header">
             <div class="section-icon">2</div>
-            <div class="section-title">Email Template + Auto</div>
+            <div class="section-title">Email Template</div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Brand Name</label>
-            <input type="text" class="form-control" id="brandName" placeholder="Amazon / Flipkart / etc.">
-          </div>
+          <textarea class="form-control" id="brandName" rows="3"
+            placeholder="Enter one brand per line&#10;Amazon&#10;Flipkart&#10;Myntra">
+</textarea>
 
-          <div class="form-group">
-            <label class="form-label">Template Name</label>
-            <input type="text" class="form-control" id="templateName" placeholder="My Marketing Campaign">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Subject Line</label>
-            <input type="text" class="form-control" id="subjectLine"
-              placeholder="{{firstName}} | Campaign Evaluation – {{brandName}}">
-          </div>
+          <textarea class="form-control" id="subjectLine" rows="4" placeholder="Enter one subject per line">
+</textarea>
 
           <div class="form-group">
             <label class="form-label">Merge Fields</label>
