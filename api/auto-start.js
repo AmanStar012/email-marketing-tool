@@ -2,71 +2,88 @@ const { cors, redisGet, redisSet } = require("./_shared");
 
 module.exports = async function handler(req, res) {
   cors(res);
-
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
   try {
-    const { contacts, brandName, template } = req.body || {};
     const now = Date.now();
+    const { contacts, brandName, template } = req.body || {};
 
-    // ✅ FIX 1: CSV validation (unchanged but critical)
+    const lastId = await redisGet("auto:campaign:last");
+
+    if (lastId) {
+      const lastCampaign = await redisGet(`auto:campaign:${lastId}`);
+
+      if (lastCampaign && lastCampaign.status === "stopped") {
+        // Resume campaign
+        lastCampaign.status = "running";
+        lastCampaign.updatedAt = now;
+
+        await redisSet(`auto:campaign:${lastId}`, lastCampaign);
+        await redisSet("auto:campaign:active", lastId);
+
+        // Update live state
+        await redisSet(`auto:campaign:${lastId}:live`, {
+          currentAccountId: null,
+          currentEmail: null,
+          currentSenderName: null,
+          state: "running",
+          updatedAt: now
+        });
+
+        // Push resume event
+        const eventsKey = `auto:campaign:${lastId}:events`;
+        let events = (await redisGet(eventsKey)) || [];
+        if (!Array.isArray(events)) events = [];
+        events.push({ ts: now, status: "campaign_resumed", campaignId: lastId });
+        if (events.length > 300) events = events.slice(-300);
+        await redisSet(eventsKey, events);
+
+        return res.status(200).json({
+          success: true,
+          campaignId: lastId,
+          resumed: true
+        });
+      }
+    }
+
     if (!Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "contacts array is required"
-      });
+      return res.status(400).json({ success: false, error: "contacts is required" });
     }
 
-    // ✅ FIX 2: brandName validation (STRING OR ARRAY)
-    const validBrand =
-      Array.isArray(brandName)
-        ? brandName.length > 0
-        : typeof brandName === "string" && brandName.trim().length > 0;
-
-    if (!validBrand) {
-      return res.status(400).json({
-        success: false,
-        error: "brandName is required"
-      });
+    const hasBrand =
+      Array.isArray(brandName) ? brandName.length > 0 : Boolean(brandName);
+    if (!hasBrand) {
+      return res.status(400).json({ success: false, error: "brandName is required" });
     }
 
-    // ✅ FIX 3: template validation (STRING OR ARRAY)
-    if (!template || typeof template !== "object") {
-      return res.status(400).json({
-        success: false,
-        error: "template is required"
-      });
-    }
-
-    const validSubject =
-      Array.isArray(template.subject)
+    const hasSubject =
+      Array.isArray(template?.subject)
         ? template.subject.length > 0
-        : typeof template.subject === "string" && template.subject.trim().length > 0;
+        : Boolean(template?.subject);
 
-    const validContent =
-      Array.isArray(template.content)
+    const hasContent =
+      Array.isArray(template?.content)
         ? template.content.length > 0
-        : typeof template.content === "string" && template.content.trim().length > 0;
+        : Boolean(template?.content);
 
-    if (!validSubject || !validContent) {
+    if (!hasSubject || !hasContent) {
       return res.status(400).json({
         success: false,
         error: "template.subject and template.content are required"
       });
     }
-
-    // ✅ FIX 4: create campaign (CSV STORED HERE)
+    
     const campaignId = `c_${Date.now()}`;
 
     const campaign = {
       id: campaignId,
       status: "running",
-      contacts,      // ✅ CSV SAVED
-      brandName,     // string OR array
-      template,      // subject/content string OR array
+      contacts,
+      brandName,
+      template,
       cursor: 0,
       total: contacts.length,
       createdAt: now,
@@ -77,6 +94,7 @@ module.exports = async function handler(req, res) {
     await redisSet("auto:campaign:active", campaignId);
     await redisSet("auto:campaign:last", campaignId);
 
+    // Init stats
     await redisSet(`auto:campaign:${campaignId}:stats`, {
       campaignId,
       totalSent: 0,
@@ -84,24 +102,27 @@ module.exports = async function handler(req, res) {
       byAccount: {}
     });
 
+    // Init live state
+    await redisSet(`auto:campaign:${campaignId}:live`, {
+      currentAccountId: null,
+      currentEmail: null,
+      currentSenderName: null,
+      state: "running",
+      updatedAt: now
+    });
+
+    // Init events
     await redisSet(`auto:campaign:${campaignId}:events`, [
-      {
-        ts: now,
-        status: "campaign_started",
-        campaignId,
-        total: contacts.length
-      }
+      { ts: now, status: "campaign_started", campaignId }
     ]);
 
     return res.status(200).json({
       success: true,
-      campaignId
+      campaignId,
+      resumed: false
     });
 
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: err.message
-    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
   }
 };
