@@ -739,11 +739,12 @@
             <div class="section-title">Email Template</div>
           </div>
 
-          <textarea class="form-control" id="brandName" rows="3"
+          <textarea class="form-control form-control-textarea" id="brandName" rows="3"
             placeholder="Enter one brand per line&#10;Amazon&#10;Flipkart&#10;Myntra">
 </textarea>
 
-          <textarea class="form-control" id="subjectLine" rows="4" placeholder="Enter one subject per line">
+          <textarea class="form-control  form-control-textarea" id="subjectLine" rows="4"
+            placeholder="Enter one subject per line">
 </textarea>
 
           <div class="form-group">
@@ -767,10 +768,6 @@
             <div class="auto-status" id="autoStatusBox">Auto Status: (loading...)</div>
 
             <div class="auto-panels">
-              <div class="auto-panel">
-                <h4>📨 Current Sender (Live)</h4>
-                <div id="autoLiveBox" class="mini">—</div>
-              </div>
 
               <div class="auto-panel">
                 <h4>📊 Per-Account Stats</h4>
@@ -944,9 +941,9 @@
     });
 
     function initializeApp() {
-      setupEventListeners();
+      loadSavedTemplateFromLocalStorage(); 
+      setupEventListeners();               
       initializeUploadZone();
-      loadSavedTemplateFromLocalStorage();
       loadAccountsFromBackend();
       updateMergeFields([]);
       updateStats();
@@ -957,7 +954,6 @@
         refreshAutoStatus().catch(() => { });
         loadAccountsFromBackend().catch(() => { });
       }, 5000);
-
     }
 
     function setupEventListeners() {
@@ -979,10 +975,11 @@
         {
           id: "startCampaign",
           event: "click",
-          handler: startCampaignManual  
+          handler: startCampaignManual
         }
       ];
 
+      // Button / file bindings
       bindings.forEach(({ id, event, handler }) => {
         const el = document.getElementById(id);
         if (!el) {
@@ -991,7 +988,15 @@
         }
         el.addEventListener(event, handler);
       });
+
+      // 🔥 TEMPLATE AUTO-SAVE (THIS WAS MISSING AFTER 5 SUBJECT CHANGE)
+      ['brandName', 'subjectLine', 'emailContent'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', saveTemplateToLocalStorage);
+      });
     }
+
 
 
 
@@ -1579,25 +1584,38 @@
 
     function saveTemplateToLocalStorage() {
       const data = {
-        brandName: document.getElementById('brandName').value || '',
-        templateName: document.getElementById('templateName').value || '',
-        subject: document.getElementById('subjectLine').value || '',
-        content: document.getElementById('emailContent').value || ''
+        brandRaw: document.getElementById('brandName')?.value || '',
+        subjectRaw: document.getElementById('subjectLine')?.value || '',
+        contentRaw: document.getElementById('emailContent')?.value || ''
       };
-      localStorage.setItem("last_template_state", JSON.stringify(data));
+
+      localStorage.setItem(
+        "last_template_state",
+        JSON.stringify(data)
+      );
     }
 
     function loadSavedTemplateFromLocalStorage() {
+      const raw = localStorage.getItem("last_template_state");
+      if (!raw) return;
+
       try {
-        const raw = localStorage.getItem("last_template_state");
-        if (!raw) return;
         const data = JSON.parse(raw);
-        if (data.brandName != null) document.getElementById('brandName').value = data.brandName;
-        if (data.templateName != null) document.getElementById('templateName').value = data.templateName;
-        if (data.subject != null) document.getElementById('subjectLine').value = data.subject;
-        if (data.content != null) document.getElementById('emailContent').value = data.content;
-      } catch { }
+
+        if (document.getElementById('brandName'))
+          document.getElementById('brandName').value = data.brandRaw || '';
+
+        if (document.getElementById('subjectLine'))
+          document.getElementById('subjectLine').value = data.subjectRaw || '';
+
+        if (document.getElementById('emailContent'))
+          document.getElementById('emailContent').value = data.contentRaw || '';
+      } catch (e) {
+        console.warn("Failed to restore template state", e);
+      }
     }
+
+
 
     function downloadSampleCSV() {
       const sampleData = `firstName,lastName,email,company
