@@ -960,22 +960,39 @@
 
     }
 
-function setupEventListeners() {
-  const bindings = [
-    { id: "csvFileInput", event: "change", handler: handleCSVUpload },
-    { id: "autoStartBtn", event: "click", handler: startAutoCampaign },
-    { id: "manualSendBtn", event: "click", handler: startManualCampaign }
-  ];
+    function setupEventListeners() {
+      const bindings = [
+        {
+          id: "csvFileInput",
+          event: "change",
+          handler: (e) => {
+            if (e.target.files && e.target.files[0]) {
+              processFile(e.target.files[0]);
+            }
+          }
+        },
+        {
+          id: "autoStartBtn",
+          event: "click",
+          handler: startAutoCampaign
+        },
+        {
+          id: "manualSendBtn",
+          event: "click",
+          handler: startManualCampaign
+        }
+      ];
 
-  bindings.forEach(({ id, event, handler }) => {
-    const el = document.getElementById(id);
-    if (!el) {
-      console.warn(`Element not found: #${id}`);
-      return;
+      bindings.forEach(({ id, event, handler }) => {
+        const el = document.getElementById(id);
+        if (!el) {
+          console.warn(`Element not found: #${id}`);
+          return;
+        }
+        el.addEventListener(event, handler);
+      });
     }
-    el.addEventListener(event, handler);
-  });
-}
+
 
 
     function initializeUploadZone() {
@@ -1274,48 +1291,48 @@ function setupEventListeners() {
     }
 
     // AUTO Campaign
-async function startAutoCampaign() {
-  
-  if (!Array.isArray(state.contacts) || state.contacts.length === 0) {
-    log('Upload CSV first', 'error');
-    return;
-  }
+    async function startAutoCampaign() {
 
-  const brandRaw = document.getElementById('brandName')?.value || '';
-  const subjectRaw = document.getElementById('subjectLine')?.value || '';
-  const contentRaw = document.getElementById('emailContent')?.value || '';
+      if (!Array.isArray(state.contacts) || state.contacts.length === 0) {
+        log('Upload CSV first', 'error');
+        return;
+      }
 
-  const brands = brandRaw.split('\n').map(v => v.trim()).filter(Boolean);
-  const subjects = subjectRaw.split('\n').map(v => v.trim()).filter(Boolean);
-  const bodies = contentRaw.split('---').map(v => v.trim()).filter(Boolean);
+      const brandRaw = document.getElementById('brandName')?.value || '';
+      const subjectRaw = document.getElementById('subjectLine')?.value || '';
+      const contentRaw = document.getElementById('emailContent')?.value || '';
 
-  if (!brands.length || !subjects.length || !bodies.length) {
-    log('Brand, subject, and body are required', 'error');
-    return;
-  }
+      const brands = brandRaw.split('\n').map(v => v.trim()).filter(Boolean);
+      const subjects = subjectRaw.split('\n').map(v => v.trim()).filter(Boolean);
+      const bodies = contentRaw.split('---').map(v => v.trim()).filter(Boolean);
 
-  const contacts = state.contacts.map(c => normalizeContactEmailKey(c));
+      if (!brands.length || !subjects.length || !bodies.length) {
+        log('Brand, subject, and body are required', 'error');
+        return;
+      }
 
-  const payload = {
-    contacts,
-    brandName: brands,
-    template: {
-      subject: subjects,
-      content: bodies
+      const contacts = state.contacts.map(c => normalizeContactEmailKey(c));
+
+      const payload = {
+        contacts,
+        brandName: brands,
+        template: {
+          subject: subjects,
+          content: bodies
+        }
+      };
+
+      console.log("AUTO CAMPAIGN PAYLOAD:", payload);
+
+      // 7️⃣ Send to backend
+      try {
+        const r = await emailAPI.autoStart(payload);
+        log(`Auto campaign started: ${r.campaignId}`, 'success');
+        await refreshAutoStatus();
+      } catch (e) {
+        log(`Auto start failed: ${e.message}`, 'error');
+      }
     }
-  };
-
-  console.log("AUTO CAMPAIGN PAYLOAD:", payload);
-
-  // 7️⃣ Send to backend
-  try {
-    const r = await emailAPI.autoStart(payload);
-    log(`Auto campaign started: ${r.campaignId}`, 'success');
-    await refreshAutoStatus();
-  } catch (e) {
-    log(`Auto start failed: ${e.message}`, 'error');
-  }
-}
 
 
     async function stopAutoCampaign() {
