@@ -1,4 +1,17 @@
-const { cors, redisGet, redisSet } = require("./_shared");
+const { cors, redisGet, redisSet, redisDel } = require("./_shared");
+
+function isSameContacts(a = [], b = []) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  if (!a.length) return false;
+
+  const aFirst = a[0]?.email;
+  const aLast = a[a.length - 1]?.email;
+  const bFirst = b[0]?.email;
+  const bLast = b[b.length - 1]?.email;
+
+  return aFirst === bFirst && aLast === bLast;
+}
 
 module.exports = async function handler(req, res) {
   cors(res);
@@ -10,44 +23,6 @@ module.exports = async function handler(req, res) {
   try {
     const now = Date.now();
     const { contacts, brandName, template } = req.body || {};
-
-    const lastId = await redisGet("auto:campaign:last");
-
-    if (lastId) {
-      const lastCampaign = await redisGet(`auto:campaign:${lastId}`);
-
-      if (lastCampaign && lastCampaign.status === "stopped") {
-        // Resume campaign
-        lastCampaign.status = "running";
-        lastCampaign.updatedAt = now;
-
-        await redisSet(`auto:campaign:${lastId}`, lastCampaign);
-        await redisSet("auto:campaign:active", lastId);
-
-        // Update live state
-        await redisSet(`auto:campaign:${lastId}:live`, {
-          currentAccountId: null,
-          currentEmail: null,
-          currentSenderName: null,
-          state: "running",
-          updatedAt: now
-        });
-
-        // Push resume event
-        const eventsKey = `auto:campaign:${lastId}:events`;
-        let events = (await redisGet(eventsKey)) || [];
-        if (!Array.isArray(events)) events = [];
-        events.push({ ts: now, status: "campaign_resumed", campaignId: lastId });
-        if (events.length > 300) events = events.slice(-300);
-        await redisSet(eventsKey, events);
-
-        return res.status(200).json({
-          success: true,
-          campaignId: lastId,
-          resumed: true
-        });
-      }
-    }
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
       return res.status(400).json({ success: false, error: "contacts is required" });
@@ -75,7 +50,58 @@ module.exports = async function handler(req, res) {
         error: "template.subject and template.content are required"
       });
     }
-    
+
+    /**
+     * ===============================
+     * 🔁 RESUME ONLY IF SAME CONTACTS
+     * ===============================
+     */
+    const lastId = await redisGet("auto:campaign:last");
+
+    if (lastId) {
+      const lastCampaign = await redisGet(`auto:campaign:${lastId}`);
+
+      if (
+        lastCampaign &&
+        lastCampaign.status === "stopped" &&
+        isSameContacts(lastCampaign.contacts, contacts)
+      ) {
+        lastCampaign.status = "running";
+        lastCampaign.updatedAt = now;
+
+        await redisSet(`auto:campaign:${lastId}`, lastCampaign);
+        await redisSet("auto:campaign:active", lastId);
+
+        // reset cooldown + retry
+        await redisDel(`auto:campaign:${lastId}:lastSendAt`);
+        await redisDel(`auto:campaign:${lastId}:retry`);
+
+        await redisSet(`auto:campaign:${lastId}:live`, {
+          currentAccountId: null,
+          currentEmail: null,
+          currentSenderName: null,
+          state: "running",
+          updatedAt: now
+        });
+
+        const eventsKey = `auto:campaign:${lastId}:events`;
+        const events = (await redisGet(eventsKey)) || [];
+        events.push({ ts: now, status: "campaign_resumed", campaignId: lastId });
+        await redisSet(eventsKey, events.slice(-300));
+
+        return res.status(200).json({
+          success: true,
+          campaignId: lastId,
+          resumed: true
+        });
+      }
+    }
+
+    /**
+     * ===============================
+     * 🆕 NEW CAMPAIGN (NEW CSV)
+     * ===============================
+     */
     const campaignId = `c_${Date.now()}`;
 
     const campaign = {
@@ -94,7 +120,9 @@ module.exports = async function handler(req, res) {
     await redisSet("auto:campaign:active", campaignId);
     await redisSet("auto:campaign:last", campaignId);
 
-    // Init stats
+    await redisDel(`auto:campaign:${campaignId}:lastSendAt`);
+    await redisDel(`auto:campaign:${campaignId}:retry`);
+
     await redisSet(`auto:campaign:${campaignId}:stats`, {
       campaignId,
       totalSent: 0,
@@ -102,7 +130,6 @@ module.exports = async function handler(req, res) {
       byAccount: {}
     });
 
-    // Init live state
     await redisSet(`auto:campaign:${campaignId}:live`, {
       currentAccountId: null,
       currentEmail: null,
@@ -111,7 +138,6 @@ module.exports = async function handler(req, res) {
       updatedAt: now
     });
 
-    // Init events
     await redisSet(`auto:campaign:${campaignId}:events`, [
       { ts: now, status: "campaign_started", campaignId }
     ]);
