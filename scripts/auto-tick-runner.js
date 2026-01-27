@@ -10,11 +10,6 @@ const {
   redisDel
 } = require("../api/_shared");
 
-/**
- * ===============================
- * CONFIG
- * ===============================
- */
 const EMAILS_PER_ACCOUNT = 30;           
 const PER_EMAIL_DELAY_MS = 60 * 1000;   
 const ONE_HOUR = 60 * 60 * 1000;        
