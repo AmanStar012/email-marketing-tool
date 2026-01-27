@@ -10,19 +10,29 @@ const {
   redisDel
 } = require("../api/_shared");
 
-const EMAILS_PER_ACCOUNT = 40;
-const PER_EMAIL_DELAY_MS = 1000;
+/**
+ * ===============================
+ * CONFIG
+ * ===============================
+ */
+const EMAILS_PER_ACCOUNT = 30;           
+const PER_EMAIL_DELAY_MS = 60 * 1000;   
+const ONE_HOUR = 60 * 60 * 1000;        
+const DAILY_LIMIT = 300;               
 const MAX_RETRY = 1;
 
 /**
- * Picks a random value.
- * Supports string OR array (backend-safe, backward-compatible)
+ * Picks random value (array or string)
  */
 function pickRandom(value) {
   if (Array.isArray(value)) {
     return value[Math.floor(Math.random() * value.length)];
   }
   return value;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 (async function runAutoTick() {
@@ -39,10 +49,21 @@ function pickRandom(value) {
     const retryKey = `auto:campaign:${activeId}:retry`;
     const statsKey = `auto:campaign:${activeId}:stats`;
     const eventsKey = `auto:campaign:${activeId}:events`;
+    const lastSendKey = `auto:campaign:${activeId}:lastSendAt`;
 
     const campaign = await redisGet(campaignKey);
     if (!campaign || campaign.status !== "running") {
       console.log("ℹ️ Campaign not running");
+      process.exit(0);
+    }
+
+    /**
+     * ⏱️ 1-HOUR GAP BETWEEN BATCHES
+     */
+    const lastSendAt = await redisGet(lastSendKey);
+    const now = Date.now();
+    if (lastSendAt && now - Number(lastSendAt) < ONE_HOUR) {
+      console.log("⏳ Batch cooldown active");
       process.exit(0);
     }
 
@@ -63,20 +84,26 @@ function pickRandom(value) {
     const contacts = campaign.contacts;
     const total = contacts.length;
 
-    // Create jobs per account
-    const jobs = connectedAccounts.map((acc) => ({
+    /**
+     * Create jobs
+     */
+    const jobs = connectedAccounts.map(acc => ({
       account: acc,
       queue: []
     }));
 
-    // 1️⃣ Fill retry queue first
+    /**
+     * Retry queue first
+     */
     for (const job of jobs) {
       while (job.queue.length < EMAILS_PER_ACCOUNT && retryQueue.length > 0) {
         job.queue.push(retryQueue.shift());
       }
     }
 
-    // 2️⃣ Fill new contacts
+    /**
+     * New contacts
+     */
     for (const job of jobs) {
       while (job.queue.length < EMAILS_PER_ACCOUNT && cursor < total) {
         job.queue.push({ contact: contacts[cursor], retry: 0 });
@@ -84,7 +111,9 @@ function pickRandom(value) {
       }
     }
 
-    // Save cursor progress
+    /**
+     * Save cursor
+     */
     campaign.cursor = cursor;
     campaign.updatedAt = Date.now();
     await redisSet(campaignKey, campaign);
@@ -96,12 +125,24 @@ function pickRandom(value) {
       byAccount: {}
     };
 
-    // 3️⃣ Process each account
+    /**
+     * Process accounts
+     */
     await Promise.all(
       jobs.map(async ({ account, queue }) => {
         if (!queue.length) return;
 
         const accId = String(account.id);
+        const today = todayKey();
+        const dailyKey = `auto:account:${accId}:dailyCount:${today}`;
+        let dailyCount = Number(await redisGet(dailyKey)) || 0;
+
+        // 🚫 DAILY LIMIT CHECK
+        if (dailyCount >= DAILY_LIMIT) {
+          console.log(`🚫 Daily limit reached for ${account.email}`);
+          return;
+        }
+
         stats.byAccount[accId] ||= {
           email: account.email,
           senderName: account.senderName,
@@ -110,15 +151,19 @@ function pickRandom(value) {
           lastSentAt: null
         };
 
-        let transporter = createTransporter(account);
+        const transporter = createTransporter(account);
 
         for (const item of queue) {
+          if (dailyCount >= DAILY_LIMIT) {
+            console.log(`🚫 Daily limit reached mid-batch for ${account.email}`);
+            break;
+          }
+
           const { contact, retry } = item;
           const to = contact.email;
           if (!to) continue;
 
           try {
-            // 🔥 RANDOM SELECTION (KEY CHANGE)
             const randomBrand = pickRandom(campaign.brandName);
             const randomSubject = pickRandom(campaign.template.subject);
             const randomBody = pickRandom(campaign.template.content);
@@ -140,6 +185,9 @@ function pickRandom(value) {
               html
             });
 
+            dailyCount++;
+            await redisSet(dailyKey, dailyCount);
+
             stats.totalSent++;
             stats.byAccount[accId].sent++;
             stats.byAccount[accId].lastSentAt = Date.now();
@@ -159,15 +207,12 @@ function pickRandom(value) {
             stats.totalFailed++;
             stats.byAccount[accId].failed++;
 
-            // Account-level failure → disable account
             if (looksLikeAccountLevelFailure(err)) {
               runtime[accId] = { connected: false, lastError: err.message };
               await redisSet("accounts:runtime", runtime);
-              console.error(`❌ Account disabled: ${account.email}`);
               break;
             }
 
-            // Retry logic
             if (retry < MAX_RETRY) {
               retryQueue.push({ contact, retry: retry + 1 });
             }
@@ -186,11 +231,15 @@ function pickRandom(value) {
       })
     );
 
-    // Save retry + stats
     await redisSet(retryKey, retryQueue);
     await redisSet(statsKey, stats);
 
-    // 4️⃣ Finish campaign if done
+    // ✅ batch timestamp
+    await redisSet(lastSendKey, Date.now());
+
+    /**
+     * Finish campaign
+     */
     if (campaign.cursor >= total && retryQueue.length === 0) {
       campaign.status = "completed";
       campaign.updatedAt = Date.now();
@@ -204,10 +253,6 @@ function pickRandom(value) {
         campaignId: campaign.id
       });
       await redisSet(eventsKey, ev.slice(-300));
-
-      console.log("✅ Campaign completed");
-    } else {
-      console.log("⏳ Tick complete, waiting for next run");
     }
 
     process.exit(0);
