@@ -1633,17 +1633,27 @@ Jane,Smith,jane.smith@example.com,Tech`;
       document.getElementById('failedCount').textContent = state.stats.failed;
     }
 
-    function log(message, type = 'info') {
-      const logArea = document.getElementById('logArea');
-      const timestamp = new Date().toLocaleTimeString();
-      const entry = document.createElement('div');
-      entry.className = `log-entry log-${type}`;
-      entry.textContent = `[${timestamp}] ${message}`;
-      logArea.appendChild(entry);
-      logArea.scrollTop = logArea.scrollHeight;
-      const entries = logArea.querySelectorAll('.log-entry');
-      if (entries.length > 120) entries[0].remove();
-    }
+  function log(message, type = 'info') {
+  const logArea = document.getElementById('logArea');
+
+  // 🔒 SAFETY GUARD (this fixes everything)
+  if (!logArea) {
+    console.warn('[LOG SKIPPED]', message);
+    return;
+  }
+
+  const timestamp = new Date().toLocaleTimeString();
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${type}`;
+  entry.textContent = `[${timestamp}] ${message}`;
+
+  logArea.appendChild(entry);
+  logArea.scrollTop = logArea.scrollHeight;
+
+  const entries = logArea.querySelectorAll('.log-entry');
+  if (entries.length > 120) entries[0].remove();
+}
+
 
     function formatFileSize(bytes) {
       if (bytes === 0) return '0 Bytes';
