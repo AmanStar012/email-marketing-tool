@@ -1276,7 +1276,11 @@
           state.stats.successRate = result.results.successRate;
           state.stats.inQueue = 0;
           updateStats();
-          document.getElementById('progressFill').style.width = '100%';
+          const progressEl = document.getElementById('progressFill');
+          if (progressEl) {
+            progressEl.style.width =
+              `${Math.min(100, Math.max(0, percent))}%`;
+          }
           log(`✅ Manual done: ${result.results.sent} sent, ${result.results.failed} failed`, 'success');
         }
       } catch (e) {
@@ -1440,7 +1444,11 @@
       state.stats.inQueue = csvTotal;
       state.stats.successRate = 0;
       updateStats();
-      document.getElementById('progressFill').style.width = '0%';
+      const progressEl = document.getElementById('progressFill');
+if (progressEl) {
+  progressEl.style.width = '0%';
+}
+
     }
 
     async function sendTestEmail() {
