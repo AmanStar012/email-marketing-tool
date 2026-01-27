@@ -843,7 +843,7 @@
       </div>
     </div>
 
-    
+
   </div>
 
   <script>
@@ -1628,15 +1628,26 @@ Jane,Smith,jane.smith@example.com,Tech`;
 
     function log(message, type = 'info') {
       const logArea = document.getElementById('logArea');
+
+      if (!logArea) {
+        console.warn('[LOG skipped]', message);
+        return;
+      }
+
       const timestamp = new Date().toLocaleTimeString();
       const entry = document.createElement('div');
       entry.className = `log-entry log-${type}`;
       entry.textContent = `[${timestamp}] ${message}`;
+
       logArea.appendChild(entry);
       logArea.scrollTop = logArea.scrollHeight;
+
       const entries = logArea.querySelectorAll('.log-entry');
-      if (entries.length > 120) entries[0].remove();
+      if (entries.length > 120) {
+        entries[0].remove();
+      }
     }
+
 
     function formatFileSize(bytes) {
       if (bytes === 0) return '0 Bytes';
