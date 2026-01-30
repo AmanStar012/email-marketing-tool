@@ -7,18 +7,34 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
+/* =========================
+   Redis Namespace
+   ========================= */
+const REDIS_NAMESPACE = process.env.REDIS_NAMESPACE || "default";
+
+function ns(key) {
+  return `${REDIS_NAMESPACE}:${key}`;
+}
+
+/* =========================
+   CORS
+   ========================= */
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-auto-secret");
 }
 
-// Sleep function
+/* =========================
+   Sleep
+   ========================= */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Load accounts from file
+/* =========================
+   Load accounts
+   ========================= */
 function loadAccountsConfig() {
   const filePath = path.join(process.cwd(), "accounts.json");
 
@@ -28,6 +44,7 @@ function loadAccountsConfig() {
 
   const raw = fs.readFileSync(filePath, "utf8");
   let accounts;
+
   try {
     accounts = JSON.parse(raw);
   } catch {
@@ -55,7 +72,9 @@ function loadAccountsConfig() {
   });
 }
 
-// Merge helper
+/* =========================
+   Merge helpers
+   ========================= */
 function applyMerge(text, vars = {}) {
   if (!text || typeof text !== "string") return "";
   let out = text;
@@ -72,7 +91,9 @@ function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Convert text to HTML
+/* =========================
+   Text → HTML
+   ========================= */
 function convertTextToHTML(text) {
   if (!text) return "";
   return String(text)
@@ -85,7 +106,9 @@ function convertTextToHTML(text) {
     .replace(/$/, "</div>");
 }
 
-// Nodemailer transporter
+/* =========================
+   Nodemailer
+   ========================= */
 function createTransporter(account) {
   const user = (account.email || "").trim();
   const pass = (account.pass || "").trim();
@@ -100,7 +123,9 @@ function createTransporter(account) {
   });
 }
 
-// 🔴 THIS WAS MISSING — ROOT CAUSE FIX
+/* =========================
+   Account-level failure detection
+   ========================= */
 function looksLikeAccountLevelFailure(err) {
   if (!err) return false;
   const msg = String(err.message || err).toLowerCase();
@@ -117,7 +142,9 @@ function looksLikeAccountLevelFailure(err) {
   );
 }
 
-// Redis
+/* =========================
+   Redis Client
+   ========================= */
 let _redisClient = null;
 let _redisConnecting = null;
 
@@ -144,9 +171,12 @@ async function getRedisClient() {
   return _redisClient;
 }
 
+/* =========================
+   Redis helpers (NAMESPACED)
+   ========================= */
 async function redisGet(key) {
   const client = await getRedisClient();
-  const raw = await client.get(key);
+  const raw = await client.get(ns(key));
   if (raw == null) return null;
   try {
     return JSON.parse(raw);
@@ -158,14 +188,17 @@ async function redisGet(key) {
 async function redisSet(key, value) {
   const client = await getRedisClient();
   const v = typeof value === "string" ? value : JSON.stringify(value);
-  await client.set(key, v);
+  await client.set(ns(key), v);
 }
 
 async function redisDel(key) {
   const client = await getRedisClient();
-  await client.del(key);
+  await client.del(ns(key));
 }
 
+/* =========================
+   Exports
+   ========================= */
 module.exports = {
   cors,
   sleep,
