@@ -25,6 +25,7 @@ jobs:
       - name: Run auto runner
         env:
           REDIS_URL: ${{ secrets.REDIS_URL }}
+          REDIS_NAMESPACE: projectA
 
           PASS_1: ${{ secrets.PASS_1 }}
           PASS_2: ${{ secrets.PASS_2 }}
