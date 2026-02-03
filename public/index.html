@@ -806,6 +806,20 @@
       border: 1px solid var(--border-1)
     }
 
+    #autoStatusBox {
+      color: #e2e8f0
+    }
+
+    #autoStatusBox strong {
+      color: #ffffff
+    }
+
+    #autoLiveBox .pill-green {
+      background: rgba(34, 197, 94, .25);
+      color: #86efac;
+      box-shadow: 0 0 12px rgba(34, 197, 94, .35)
+    }
+
     .email-account {
       background: var(--surface-2);
       border: 2px solid rgba(148, 163, 184, .2)
@@ -1031,9 +1045,6 @@
           <div class="email-accounts" id="emailAccounts"></div>
 
           <div class="action-buttons">
-            <button class="btn btn-small" id="previewBtn">👁️ Preview</button>
-            <button class="btn btn-small" id="saveBtn">💾 Save Template</button>
-            <button class="btn btn-small btn-secondary" id="downloadSample">📥 Sample CSV</button>
           </div>
         </div>
       </div>
@@ -1649,42 +1660,7 @@
         progressEl.style.width = '0%';
       }
 
-    }
-
-    function previewEmail() {
-      if (state.contacts.length === 0) return log('Upload contacts to preview', 'error');
-
-      const brandName = document.getElementById('brandName').value.trim();
-      const subject = document.getElementById('subjectLine').value;
-      const content = document.getElementById('emailContent').value;
-
-      const sample = normalizeContactEmailKey(state.contacts[0]);
-      const active = state.emailAccounts.find(a => a.active) || state.emailAccounts[0];
-      const vars = { ...sample, brandName, senderName: active?.senderName || '' };
-
-      const previewSubject = personalizeTemplate(subject, vars);
-      const previewContent = personalizeTemplate(content, vars);
-
-      const w = window.open('', '_blank', 'width=700,height=520');
-      w.document.write(`
-      <!DOCTYPE html><html><head><title>Preview</title>
-      <style>body{font-family:Arial;padding:20px;line-height:1.6}
-        .preview-header{background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px}
-        .preview-subject{font-size:18px;font-weight:bold;margin-bottom:10px}
-        .preview-content{background:white;padding:20px;border:1px solid #ddd;border-radius:8px}
-      </style></head><body>
-        <div class="preview-header">
-          <div class="preview-subject">Subject: ${escapeHtml(previewSubject)}</div>
-          <div>To: ${escapeHtml(sample.email || '')}</div>
-        </div>
-        <div class="preview-content"><div style="white-space:pre-wrap;">${escapeHtml(previewContent)}</div></div>
-      </body></html>
-    `);
-
-      log('👁️ Preview opened', 'info');
-    }
-
-    function personalizeTemplate(template, vars) {
+    }\n\n    function personalizeTemplate(template, vars) {
       if (!template || typeof template !== 'string') return template;
       let out = template;
       Object.keys(vars || {}).forEach(k => {
@@ -1700,26 +1676,7 @@
     function normalizeContactEmailKey(contact) {
       const email = getContactEmail(contact);
       return { ...contact, email };
-    }
-
-    function saveTemplate() {
-      const templateName = document.getElementById('templateName').value || 'Untitled Template';
-      const template = {
-        name: templateName,
-        brandName: document.getElementById('brandName').value || '',
-        subject: document.getElementById('subjectLine').value,
-        content: document.getElementById('emailContent').value,
-        timestamp: new Date().toISOString()
-      };
-      try {
-        localStorage.setItem(`template_${Date.now()}`, JSON.stringify(template));
-        log(`💾 Template saved: "${templateName}"`, 'success');
-      } catch (e) {
-        log(`❌ Save failed: ${e.message}`, 'error');
-      }
-    }
-
-    function saveTemplateToLocalStorage() {
+    }\n\n    function saveTemplateToLocalStorage() {
       const data = {
         brandRaw: document.getElementById('brandName')?.value || '',
         subjectRaw: document.getElementById('subjectLine')?.value || '',
@@ -1750,25 +1707,7 @@
       } catch (e) {
         console.warn("Failed to restore template state", e);
       }
-    }
-
-
-
-    function downloadSampleCSV() {
-      const sampleData = `firstName,lastName,email,company
-John,Doe,john.doe@example.com,Acme
-Jane,Smith,jane.smith@example.com,Tech`;
-      const blob = new Blob([sampleData], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sample_contacts.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-      log('📥 Sample CSV downloaded', 'success');
-    }
-
-    function updateStats() {
+    }\n\n    function updateStats() {
       document.getElementById('totalSent').textContent = state.stats.totalSent;
       document.getElementById('successRate').textContent = state.stats.successRate + '%';
       document.getElementById('inQueue').textContent = state.stats.inQueue;
@@ -1820,6 +1759,9 @@ Jane,Smith,jane.smith@example.com,Tech`;
 </body>
 
 </html>
+
+
+
 
 
 

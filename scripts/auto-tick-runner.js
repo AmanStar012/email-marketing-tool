@@ -71,6 +71,7 @@ function isWithinIndiaSendWindow() {
     const statsKey = `auto:campaign:${activeId}:stats`;
     const eventsKey = `auto:campaign:${activeId}:events`;
     const lastSendKey = `auto:campaign:${activeId}:lastSendAt`;
+    const liveKey = `auto:campaign:${activeId}:live`;
 
     const campaign = await redisGet(campaignKey);
     if (!campaign || campaign.status !== "running") {
@@ -197,6 +198,14 @@ function isWithinIndiaSendWindow() {
           if (!to) continue;
 
           try {
+            await redisSet(liveKey, {
+              currentAccountId: accId,
+              currentEmail: to,
+              currentSenderName: account.senderName || "",
+              state: "sending",
+              updatedAt: Date.now()
+            });
+
             const randomBrand = pickRandom(campaign.brandName);
             const randomSubject = pickRandom(campaign.template.subject);
             const randomBody = pickRandom(campaign.template.content);
@@ -225,6 +234,12 @@ function isWithinIndiaSendWindow() {
             stats.byAccount[accId].sent++;
             stats.byAccount[accId].lastSentAt = Date.now();
 
+            if (retry > 0) {
+              if (stats.totalFailed > 0) stats.totalFailed--;
+              if (stats.byAccount[accId].failed > 0) stats.byAccount[accId].failed--;
+            }
+            await redisSet(statsKey, stats);
+
             const ev = (await redisGet(eventsKey)) || [];
             ev.push({
               ts: Date.now(),
@@ -244,6 +259,7 @@ function isWithinIndiaSendWindow() {
           } catch (err) {
             stats.totalFailed++;
             stats.byAccount[accId].failed++;
+            await redisSet(statsKey, stats);
 
             if (looksLikeAccountLevelFailure(err)) {
               runtime[accId] = { connected: false, lastError: err.message };
@@ -268,6 +284,14 @@ function isWithinIndiaSendWindow() {
             await redisSet(eventsKey, ev.slice(-300));
           }
         }
+
+        await redisSet(liveKey, {
+          currentAccountId: accId,
+          currentEmail: null,
+          currentSenderName: account.senderName || "",
+          state: "running",
+          updatedAt: Date.now()
+        });
       })
     );
 
