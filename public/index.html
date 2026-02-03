@@ -1660,7 +1660,9 @@
         progressEl.style.width = '0%';
       }
 
-    }\n\n    function personalizeTemplate(template, vars) {
+    }
+
+    function personalizeTemplate(template, vars) {
       if (!template || typeof template !== 'string') return template;
       let out = template;
       Object.keys(vars || {}).forEach(k => {
@@ -1676,7 +1678,9 @@
     function normalizeContactEmailKey(contact) {
       const email = getContactEmail(contact);
       return { ...contact, email };
-    }\n\n    function saveTemplateToLocalStorage() {
+    }
+
+    function saveTemplateToLocalStorage() {
       const data = {
         brandRaw: document.getElementById('brandName')?.value || '',
         subjectRaw: document.getElementById('subjectLine')?.value || '',
@@ -1707,7 +1711,9 @@
       } catch (e) {
         console.warn("Failed to restore template state", e);
       }
-    }\n\n    function updateStats() {
+    }
+
+    function updateStats() {
       document.getElementById('totalSent').textContent = state.stats.totalSent;
       document.getElementById('successRate').textContent = state.stats.successRate + '%';
       document.getElementById('inQueue').textContent = state.stats.inQueue;
@@ -1759,6 +1765,7 @@
 </body>
 
 </html>
+
 
 
 
