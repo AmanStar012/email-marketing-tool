@@ -7,14 +7,17 @@ const {
   loadAccountsConfig,
   redisGet,
   redisSet,
+  redisSetNx,
   redisDel
 } = require("../api/_shared");
 
 const EMAILS_PER_ACCOUNT = 30;           
-const PER_EMAIL_DELAY_MS = 60 * 1000;   
+const PER_EMAIL_DELAY_MIN_MS = 30 * 1000;
+const PER_EMAIL_DELAY_MAX_MS = 90 * 1000;
 const ONE_HOUR = 60 * 60 * 1000;        
 const DAILY_LIMIT = 300;               
 const MAX_RETRY = 1;
+const TICK_LOCK_TTL_MS = 50 * 60 * 1000;
 
 /**
  * Picks random value (array or string)
@@ -30,7 +33,30 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getIndiaHour() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    hour: "numeric",
+    hour12: false
+  }).formatToParts(new Date());
+
+  const hourPart = parts.find((p) => p.type === "hour");
+  return hourPart ? Number(hourPart.value) : null;
+}
+
+function isWithinIndiaSendWindow() {
+  const hour = getIndiaHour();
+  if (hour == null || Number.isNaN(hour)) return false;
+  // 9:00 <= time < 20:00 (9 AM to 8 PM)
+  return hour >= 9 && hour < 20;
+}
+
 (async function runAutoTick() {
+  let lockKey = null;
   try {
     console.log("🚀 Auto Tick Runner started");
 
@@ -55,6 +81,11 @@ function todayKey() {
     /**
      * ⏱️ 1-HOUR GAP BETWEEN BATCHES
      */
+    if (!isWithinIndiaSendWindow()) {
+      console.log("⏰ Outside India send window (09:00-20:00 IST)");
+      process.exit(0);
+    }
+
     const lastSendAt = await redisGet(lastSendKey);
     const now = Date.now();
     if (lastSendAt && now - Number(lastSendAt) < ONE_HOUR) {
@@ -71,6 +102,13 @@ function todayKey() {
 
     if (connectedAccounts.length === 0) {
       console.log("❌ No connected accounts");
+      process.exit(0);
+    }
+
+    lockKey = "auto:tick:lock";
+    const lockAcquired = await redisSetNx(lockKey, Date.now(), TICK_LOCK_TTL_MS);
+    if (!lockAcquired) {
+      console.log("Another auto tick is running, skipping this run");
       process.exit(0);
     }
 
@@ -201,7 +239,8 @@ function todayKey() {
             });
             await redisSet(eventsKey, ev.slice(-300));
 
-            await sleep(PER_EMAIL_DELAY_MS);
+            const delayMs = randomInt(PER_EMAIL_DELAY_MIN_MS, PER_EMAIL_DELAY_MAX_MS);
+            await sleep(delayMs);
           } catch (err) {
             stats.totalFailed++;
             stats.byAccount[accId].failed++;
@@ -256,9 +295,15 @@ function todayKey() {
       await redisSet(eventsKey, ev.slice(-300));
     }
 
+    if (lockKey) await redisDel(lockKey);
     process.exit(0);
   } catch (err) {
     console.error("🔥 Auto Tick Runner crashed:", err);
+    try {
+      if (lockKey) await redisDel(lockKey);
+    } catch (_) {
+      // best-effort unlock
+    }
     process.exit(1);
   }
 })();

@@ -676,7 +676,7 @@
   <div class="container">
     <div class="header">
       <h1>🚀 Email Marketing Pro</h1>
-      <p>Manual + Auto Hourly Campaign</p>
+      <p>Auto Campaign</p>
       <div class="stats-grid">
         <div class="stat-card">
           <span class="stat-number" id="totalSent">0</span>
@@ -801,41 +801,16 @@
 
       <!-- Right Column -->
       <div class="right-column">
-        <!-- Campaign Settings (Manual) -->
-        <div class="section">
-          <div class="section-header">
-            <div class="section-icon">3</div>
-            <div class="section-title">Manual Campaign</div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Campaign Name</label>
-            <input type="text" class="form-control" id="campaignName" placeholder="Q1 2024 Newsletter">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Send Rate</label>
-            <select class="form-control" id="sendRate">
-              <option value="30">30 emails/hour per account</option>
-              <option value="40" selected>40 emails/hour per account</option>
-              <option value="50">50 emails/hour per account</option>
-            </select>
-          </div>
-
-          <button class="btn btn-success" id="startCampaign">🚀 Launch Manual Campaign</button>
-        </div>
-
         <!-- Email Accounts -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">4</div>
+            <div class="section-icon">3</div>
             <div class="section-title">Email Accounts</div>
           </div>
           <div class="email-accounts" id="emailAccounts"></div>
 
           <div class="action-buttons">
             <button class="btn btn-small" id="previewBtn">👁️ Preview</button>
-            <button class="btn btn-small" id="testBtn">🧪 Test Send</button>
             <button class="btn btn-small" id="saveBtn">💾 Save Template</button>
             <button class="btn btn-small btn-secondary" id="downloadSample">📥 Sample CSV</button>
           </div>
@@ -858,26 +833,6 @@
     // API Client
     class EmailMarketingAPI {
       constructor(baseURL = '') { this.baseURL = baseURL; }
-
-      async sendEmail(emailData) {
-        const response = await fetch(`${this.baseURL}/api/send-email`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emailData)
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to send email');
-        return result;
-      }
-
-      async sendBulkEmails(bulkData) {
-        const response = await fetch(`${this.baseURL}/api/send-bulk-emails`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bulkData)
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to send bulk emails');
-        return result;
-      }
 
       async getAccounts() {
         const response = await fetch(`${this.baseURL}/api/accounts`);
@@ -935,7 +890,7 @@
       updateMergeFields([]);
       updateStats();
       refreshAutoStatus();
-      log('UI ready. Manual + Auto available.', 'info');
+      log('UI ready. Auto available.', 'info');
 
       setInterval(() => {
         refreshAutoStatus().catch(() => { });
@@ -964,11 +919,6 @@
           event: "click",
           handler: stopAutoCampaign
         },
-        {
-          id: "startCampaign",
-          event: "click",
-          handler: startCampaignManual
-        }
       ];
 
       // Button / file bindings
@@ -1246,47 +1196,7 @@
       } catch (e) {
         log(`Failed to change status: ${e.message}`, 'error');
       }
-    }
-
-    async function startCampaignManual() {
-      if (state.contacts.length === 0) return log('Upload contacts first', 'error');
-      const activeAccount = state.emailAccounts.find(a => a.active);
-      if (!activeAccount) return log('Select a primary account', 'error');
-
-      const subject = document.getElementById('subjectLine').value;
-      const content = document.getElementById('emailContent').value;
-      if (!subject || !content) return log('Fill subject and content', 'error');
-
-      try {
-        document.getElementById('startCampaign').disabled = true;
-
-        const bulkData = {
-          contacts: state.contacts.map(c => normalizeContactEmailKey(c)),
-          template: { subject, content },
-          selectedAccount: activeAccount.id,
-          campaignId: `manual_${Date.now()}`
-        };
-
-        log(`🚀 Manual campaign starting...`, 'info');
-        const result = await emailAPI.sendBulkEmails(bulkData);
-
-        if (result.success) {
-          state.stats.totalSent = result.results.sent;
-          state.stats.failed = result.results.failed;
-          state.stats.successRate = result.results.successRate;
-          state.stats.inQueue = 0;
-          updateStats();
-          document.getElementById('progressFill').style.width = '100%';
-          log(`✅ Manual done: ${result.results.sent} sent, ${result.results.failed} failed`, 'success');
-        }
-      } catch (e) {
-        log(`❌ Manual failed: ${e.message}`, 'error');
-      } finally {
-        document.getElementById('startCampaign').disabled = false;
-      }
-    }
-
-    async function startAutoCampaign() {
+    }\n\n    async function startAutoCampaign() {
 
       if (!Array.isArray(state.contacts) || state.contacts.length === 0) {
         log('Upload CSV first', 'error');
@@ -1504,25 +1414,7 @@
         progressEl.style.width = '0%';
       }
 
-    }
-
-    async function sendTestEmail() {
-      const testEmail = prompt('Enter test email address:');
-      if (!testEmail) return;
-
-      const subject = document.getElementById('subjectLine').value || 'Test Email';
-      const content = document.getElementById('emailContent').value || 'Test body';
-
-      try {
-        log(`📧 Sending test email...`, 'info');
-        const r = await emailAPI.sendEmail({ to: testEmail, subject, content });
-        log(`✅ Test sent. Message ID: ${r.messageId}`, 'success');
-      } catch (e) {
-        log(`❌ Test failed: ${e.message}`, 'error');
-      }
-    }
-
-    function previewEmail() {
+    }\n\n    function previewEmail() {
       if (state.contacts.length === 0) return log('Upload contacts to preview', 'error');
 
       const brandName = document.getElementById('brandName').value.trim();
@@ -1691,3 +1583,5 @@ Jane,Smith,jane.smith@example.com,Tech`;
 </body>
 
 </html>
+
+
