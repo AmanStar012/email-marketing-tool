@@ -1450,11 +1450,24 @@
         } else {
           eventsLog.innerHTML = events.map(ev => {
             const ts = ev.ts ? new Date(ev.ts).toLocaleString() : '';
+            const accepted = Array.isArray(ev.accepted)
+              ? ev.accepted.join(", ")
+              : (ev.accepted ? String(ev.accepted) : "");
+            const rejected = Array.isArray(ev.rejected)
+              ? ev.rejected.join(", ")
+              : (ev.rejected ? String(ev.rejected) : "");
+            const response = ev.response ? String(ev.response) : "";
+            const detailParts = [
+              accepted ? `accepted: ${accepted}` : "",
+              rejected ? `rejected: ${rejected}` : "",
+              response ? `resp: ${response}` : ""
+            ].filter(Boolean);
+            const detailText = detailParts.length ? ` | ${detailParts.join(" | ")}` : "";
             if (ev.status === "sent") {
-              return `<div class="log-entry log-success">[${escapeHtml(ts)}] ✅ SENT | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")}</div>`;
+              return `<div class="log-entry log-success">[${escapeHtml(ts)}] ✅ SENT | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "failed") {
-              return `<div class="log-entry log-error">[${escapeHtml(ts)}] ❌ FAILED | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}</div>`;
+              return `<div class="log-entry log-error">[${escapeHtml(ts)}] ❌ FAILED | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "campaign_completed") {
               return `<div class="log-entry log-info">[${escapeHtml(ts)}] 🏁 CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;

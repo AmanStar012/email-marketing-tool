@@ -155,7 +155,7 @@ function todayKey() {
           }
 
           const { contact, retry } = item;
-          const to = contact.email;
+          const to = String(contact.email || "").trim();
           if (!to) continue;
 
           try {
@@ -173,7 +173,7 @@ function todayKey() {
             const body = applyMerge(randomBody, vars);
             const html = convertTextToHTML(body);
 
-            await transporter.sendMail({
+            const result = await transporter.sendMail({
               from: `"${account.senderName}" <${account.email}>`,
               to,
               subject,
@@ -193,7 +193,11 @@ function todayKey() {
               status: "sent",
               from: account.email,
               to,
-              subject
+              subject,
+              messageId: result && result.messageId,
+              accepted: result && result.accepted,
+              rejected: result && result.rejected,
+              response: result && result.response
             });
             await redisSet(eventsKey, ev.slice(-300));
 
@@ -218,7 +222,9 @@ function todayKey() {
               status: "failed",
               from: account.email,
               to,
-              error: err.message
+              error: err.message,
+              code: err.code,
+              response: err.response
             });
             await redisSet(eventsKey, ev.slice(-300));
           }
