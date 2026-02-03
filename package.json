@@ -4,7 +4,7 @@
   "description": "Advanced email marketing tool with Vercel + Nodemailer",
   "main": "index.js",
   "scripts": {
-    "dev": "node -e \"console.log('Use: npx vercel dev')\""
+    "dev": "node -e \"console.log('Use Vercel CLI to run dev')\""
   },
   "dependencies": {
     "@vercel/kv": "^2.0.0",
