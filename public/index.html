@@ -1196,7 +1196,9 @@
       } catch (e) {
         log(`Failed to change status: ${e.message}`, 'error');
       }
-    }\n\n    async function startAutoCampaign() {
+    }
+
+    async function startAutoCampaign() {
 
       if (!Array.isArray(state.contacts) || state.contacts.length === 0) {
         log('Upload CSV first', 'error');
@@ -1414,7 +1416,9 @@
         progressEl.style.width = '0%';
       }
 
-    }\n\n    function previewEmail() {
+    }
+
+    function previewEmail() {
       if (state.contacts.length === 0) return log('Upload contacts to preview', 'error');
 
       const brandName = document.getElementById('brandName').value.trim();
@@ -1583,5 +1587,7 @@ Jane,Smith,jane.smith@example.com,Tech`;
 </body>
 
 </html>
+
+
 
 
