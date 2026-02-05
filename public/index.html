@@ -901,6 +901,27 @@
       background: rgba(148, 163, 184, .2);
       color: #cbd5f5
     }
+    /* Editor toolbar */
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 12px 0
+    }
+
+    .toolbar-btn {
+      background: var(--surface-2);
+      color: var(--text-1);
+      border: 1px solid var(--border-1);
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px
+    }
+
+    .toolbar-btn:hover {
+      border-color: var(--accent-1)
+    }
   </style>
 </head>
 
@@ -1163,7 +1184,6 @@
         el.addEventListener(event, handler);
       });
 
-      // 🔥 TEMPLATE AUTO-SAVE (THIS WAS MISSING AFTER 5 SUBJECT CHANGE)
       ['brandName', 'subjectLine', 'emailContent'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -1174,10 +1194,10 @@
       if (search) {
         search.addEventListener('input', () => renderEmailAccounts());
       }
+
+      injectEditorToolbar();
+      enableEditorShortcuts();
     }
-
-
-
 
     function initializeUploadZone() {
       const uploadZone = document.getElementById('uploadZone');
@@ -1757,14 +1777,109 @@
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
     }
+    function injectEditorToolbar() {
+      const emailContent = document.getElementById('emailContent');
+      if (!emailContent) return;
 
-    // Expose globally
+      const emailSection = emailContent.closest('.section');
+      if (!emailSection) return;
+
+      if (document.getElementById('btnBold')) return;
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'editor-toolbar';
+      toolbar.innerHTML = `
+        <button type="button" class="toolbar-btn" id="btnBold"><b>B</b> (Ctrl/Cmd+B)</button>
+        <button type="button" class="toolbar-btn" id="btnItalic"><i>I</i> (Ctrl/Cmd+I)</button>
+        <button type="button" class="toolbar-btn" id="btnLink">Link (Ctrl/Cmd+K)</button>
+        <button type="button" class="toolbar-btn" id="btnClear">Clear formatting</button>
+      `;
+
+      const emailGroup = Array.from(emailSection.querySelectorAll('.form-group')).find(g => g.contains(emailContent));
+      if (emailGroup) {
+        emailGroup.parentNode.insertBefore(toolbar, emailGroup.nextSibling);
+      } else {
+        emailSection.insertBefore(toolbar, emailContent.nextSibling);
+      }
+
+      document.getElementById('btnBold').addEventListener('click', () => wrapSelectionWithTags(emailContent, '<b>', '</b>'));
+      document.getElementById('btnItalic').addEventListener('click', () => wrapSelectionWithTags(emailContent, '<i>', '</i>'));
+      document.getElementById('btnLink').addEventListener('click', () => createHyperlink(emailContent));
+      document.getElementById('btnClear').addEventListener('click', () => clearFormatting(emailContent));
+    }
+
+    function enableEditorShortcuts() {
+      const textarea = document.getElementById('emailContent');
+      if (!textarea) return;
+      if (textarea.dataset.shortcutBound === '1') return;
+      textarea.dataset.shortcutBound = '1';
+
+      textarea.addEventListener('keydown', (e) => {
+        const isMac = navigator.platform.toUpperCase().includes('MAC');
+        const mod = isMac ? e.metaKey : e.ctrlKey;
+        if (!mod) return;
+
+        if (e.key.toLowerCase() === 'b') {
+          e.preventDefault();
+          wrapSelectionWithTags(textarea, '<b>', '</b>');
+        } else if (e.key.toLowerCase() === 'i') {
+          e.preventDefault();
+          wrapSelectionWithTags(textarea, '<i>', '</i>');
+        } else if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          createHyperlink(textarea);
+        }
+      });
+    }
+
+    function wrapSelectionWithTags(textarea, openTag, closeTag) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      const selected = value.substring(start, end) || '';
+      const tagged = openTag + selected + closeTag;
+      textarea.value = value.substring(0, start) + tagged + value.substring(end);
+      const cursor = start + tagged.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+      saveTemplateToLocalStorage();
+    }
+
+    function createHyperlink(textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+      const selected = value.substring(start, end) || '';
+      const url = prompt('Enter URL (with http(s)://):', selected.startsWith('http') ? selected : 'https://');
+      if (!url) return;
+
+      const safeUrl = String(url).replace(/"/g, '&quot;');
+      const linkText = selected || url;
+      const tag = '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>';
+      textarea.value = value.substring(0, start) + tag + value.substring(end);
+      const cursor = start + tag.length;
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+      saveTemplateToLocalStorage();
+    }
+
+    function clearFormatting(textarea) {
+      const cleaned = (textarea.value || '')
+        .replace(/<\/?b>/gi, '')
+        .replace(/<\/?i>/gi, '')
+        .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1');
+      textarea.value = cleaned;
+      saveTemplateToLocalStorage();
+    }
+
     window.setActiveAccount = setActiveAccount;
     window.toggleConnection = toggleConnection;
   </script>
 </body>
 
 </html>
+
+
 
 
 
