@@ -259,7 +259,13 @@ name: 'Account 35',
 email: 'haiderr12124@gmail.com',
 password: 'zfxpjdjospolazoy',
 active: false
-} 
+},    {
+id: 36,
+name: 'Account 36',
+email: 'hussaintalentmanager@gmail.com',
+password: ' vopujcibukkhhwcz',
+active: false
+}
 ];
 
     // Select account based on frontend selection or use first active
