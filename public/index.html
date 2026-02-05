@@ -1802,6 +1802,10 @@
         emailSection.insertBefore(toolbar, emailContent.nextSibling);
       }
 
+      toolbar.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+      });
+
       document.getElementById('btnBold').addEventListener('click', () => wrapSelectionWithTags(emailContent, '<b>', '</b>'));
       document.getElementById('btnItalic').addEventListener('click', () => wrapSelectionWithTags(emailContent, '<i>', '</i>'));
       document.getElementById('btnLink').addEventListener('click', () => createHyperlink(emailContent));
@@ -1832,16 +1836,33 @@
       });
     }
 
+    function withEditorViewportPreserved(textarea, mutateFn) {
+      const pageX = window.scrollX;
+      const pageY = window.scrollY;
+      const textTop = textarea.scrollTop;
+      const textLeft = textarea.scrollLeft;
+
+      mutateFn();
+
+      requestAnimationFrame(() => {
+        window.scrollTo(pageX, pageY);
+        textarea.focus({ preventScroll: true });
+        textarea.scrollTop = textTop;
+        textarea.scrollLeft = textLeft;
+      });
+    }
+
     function wrapSelectionWithTags(textarea, openTag, closeTag) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const value = textarea.value;
-      const selected = value.substring(start, end) || '';
-      const tagged = openTag + selected + closeTag;
-      textarea.value = value.substring(0, start) + tagged + value.substring(end);
-      const cursor = start + tagged.length;
-      textarea.focus();
-      textarea.setSelectionRange(cursor, cursor);
+      withEditorViewportPreserved(textarea, () => {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = textarea.value;
+        const selected = value.substring(start, end) || '';
+        const tagged = openTag + selected + closeTag;
+        textarea.value = value.substring(0, start) + tagged + value.substring(end);
+        const cursor = start + tagged.length;
+        textarea.setSelectionRange(cursor, cursor);
+      });
       saveTemplateToLocalStorage();
     }
 
@@ -1853,22 +1874,25 @@
       const url = prompt('Enter URL (with http(s)://):', selected.startsWith('http') ? selected : 'https://');
       if (!url) return;
 
-      const safeUrl = String(url).replace(/"/g, '&quot;');
-      const linkText = selected || url;
-      const tag = '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>';
-      textarea.value = value.substring(0, start) + tag + value.substring(end);
-      const cursor = start + tag.length;
-      textarea.focus();
-      textarea.setSelectionRange(cursor, cursor);
+      withEditorViewportPreserved(textarea, () => {
+        const safeUrl = String(url).replace(/"/g, '&quot;');
+        const linkText = selected || url;
+        const tag = '<a href="' + safeUrl + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>';
+        textarea.value = value.substring(0, start) + tag + value.substring(end);
+        const cursor = start + tag.length;
+        textarea.setSelectionRange(cursor, cursor);
+      });
       saveTemplateToLocalStorage();
     }
 
     function clearFormatting(textarea) {
-      const cleaned = (textarea.value || '')
-        .replace(/<\/?b>/gi, '')
-        .replace(/<\/?i>/gi, '')
-        .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1');
-      textarea.value = cleaned;
+      withEditorViewportPreserved(textarea, () => {
+        const cleaned = (textarea.value || '')
+          .replace(/<\/?b>/gi, '')
+          .replace(/<\/?i>/gi, '')
+          .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1');
+        textarea.value = cleaned;
+      });
       saveTemplateToLocalStorage();
     }
 
@@ -1878,6 +1902,7 @@
 </body>
 
 </html>
+
 
 
 
