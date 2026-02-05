@@ -259,13 +259,126 @@ name: 'Account 35',
 email: 'haiderr12124@gmail.com',
 password: 'zfxpjdjospolazoy',
 active: false
-},    {
+},   
+{
 id: 36,
 name: 'Account 36',
 email: 'hussaintalentmanager@gmail.com',
-password: ' vopujcibukkhhwcz',
+password: 'vopujcibukkhhwcz',
 active: false
-}
+},
+{
+id: 37,
+name: 'Account 37',
+email: 'samsertalentmanager@gmail.com',
+password: 'iupvrrmgberxbxcm',
+active: false
+},
+{
+id: 38,
+name: 'Account 38',
+email: 'kamrentalentmanager@gmail.com',
+password: 'ouop fpzs cauz xdov',
+active: false
+},
+{
+id: 39,
+name: 'Account 39',
+email: 'sufiyatalentmanager@gmail.com',
+password: 'pliz fbzr sobh krqm',
+active: false
+},
+{
+id: 40,
+name: 'Account 40',
+email: 'devatalentmanager@gmail.com',
+password: 'lfxc pqez dllj kegw',
+active: false
+},
+{
+id: 41,
+name: 'Account 41',
+email: 'neelamtalentmanager@gmail.com',
+password: 'vzyh ubnk feyg bcpy',
+active: false
+},   
+{
+id: 42,
+name: 'Account 42',
+email: 'neetutalentmanager@gmail.com',
+password: 'nrnh gtxr nsce euws',
+active: false
+},
+{
+id: 43,
+name: 'Account 43',
+email: 'susmitatalentmanager@gmail.com',
+password: 'zpme bywv alqt uvhg',
+active: false
+}, 
+{
+id: 44,
+name: 'Account 44',
+email: 'nehatalentmanager@gmail.com',
+password: 'riiz zglw mgza xpwx',
+active: false
+}, 
+{
+id: 45,
+name: 'Account 45',
+email: 'veertalentmanager@gmail.com',
+password: 'tbhn mpof ejfo ynio',
+active: false
+}, 
+{
+id: 46,
+name: 'Account 46',
+email: 'devitalentmanager@gmail.com',
+password: 'jklr sbul lzih gcfx',
+active: false
+},
+{
+id: 47,
+name: 'Account 47',
+email: 'goldytalentmanager@gmail.com',
+password: 'xkov lazp yzmo lqwi',
+active: false
+},
+{
+id: 48,
+name: 'Account 48',
+email: 'sumittalentmanager@gmail.com',
+password: 'qkrh qvpc ejys yped',
+active: false
+},
+{
+id: 49,
+name: 'Account 49',
+email: 'sushanttalentmanager@gmail.com',
+password: 'ffof jury mrwq tuax',
+active: false
+},
+{
+id: 50,
+name: 'Account 50',
+email: 'gitatalentmanager@gmail.com',
+password: 'jrbj udor jtdi nwjj',
+active: false
+},
+{
+id: 51,
+name: 'Account 51',
+email: 'shimatalentmanager@gmail.com',
+password: 'xjkv sbhz lqet xvqt',
+active: false
+},
+{
+id: 52,
+name: 'Account 52',
+email: 'ayushtalentmanager@gmail.com',
+password: 'xjkv sbhz lqet xvqt',
+active: false
+},
 ];
 
     // Select account based on frontend selection or use first active
