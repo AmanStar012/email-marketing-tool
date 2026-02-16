@@ -903,7 +903,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>?? Email Marketing Pro</h1>
+      <h1>Email Marketing Pro</h1>
       <p>Auto Campaign</p>
       <div class="stats-grid">
         <div class="stat-card">
@@ -935,16 +935,16 @@
             <div class="section-title">Upload Contacts</div>
           </div>
           <div class="upload-zone" id="uploadZone">
-            <div class="upload-icon">??</div>
+            <div class="upload-icon">CSV</div>
             <div class="upload-text">Drop your CSV file here</div>
             <div class="upload-subtitle">or click to browse</div>
             <input type="file" id="csvInput" accept=".csv" style="display:none;">
             <button class="btn btn-small" onclick="document.getElementById('csvInput').click()">
-              ?? Choose File
+              Choose File
             </button>
           </div>
           <div class="contacts-preview" id="contactsPreview" style="display:none;">
-            <h3>?? Contacts Preview</h3>
+            <h3>Contacts Preview</h3>
             <div class="mini" id="csvCountLabel">CSV Emails: 0</div>
             <div style="height:10px"></div>
             <div id="contactsList"></div>
@@ -980,8 +980,8 @@
 
           <div class="auto-box">
             <div class="auto-row">
-              <button class="btn btn-success" id="autoStartBtn">?? Start Auto Campaign</button>
-              <button class="btn btn-danger" id="autoStopBtn">?? Stop Auto Campaign</button>
+              <button class="btn btn-success" id="autoStartBtn">Start Auto Campaign</button>
+              <button class="btn btn-danger" id="autoStopBtn">Stop Auto Campaign</button>
               <button class="btn btn-secondary" id="cleanupRedisBtn">Clean Redis Data</button>
             </div>
 
@@ -989,12 +989,12 @@
 
             <div class="auto-panels">
               <div class="auto-panel">
-                <h4>?? Current Sender (Live)</h4>
+                <h4>Current Sender (Live)</h4>
                 <div id="autoLiveBox" class="mini">—</div>
               </div>
 
               <div class="auto-panel">
-                <h4>?? Per-Account Stats</h4>
+                <h4>Per-Account Stats</h4>
                 <div class="table-wrap">
                   <table id="autoStatsTable">
                     <thead>
@@ -1017,7 +1017,7 @@
               </div>
 
               <div class="auto-panel">
-                <h4>?? Latest Send Events</h4>
+                <h4>Latest Send Events</h4>
                 <div class="log-area" id="autoEventsLog" style="max-height:220px;background:#111827">
                   <div class="log-entry log-info">No events yet</div>
                 </div>
@@ -1410,7 +1410,7 @@
             ${account.lastError ? `<div class="account-provider" style="color:#b00020;">Last error: ${escapeHtml(account.lastError)}</div>` : ''}
           </div>
           <div class="status-badge ${account.connected ? 'status-connected' : 'status-disconnected'}">
-            ${account.connected ? '? Connected' : '? Disconnected'}
+            ${account.connected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
         <div class="account-actions">
@@ -1488,7 +1488,7 @@
     async function stopAutoCampaign() {
       try {
         await emailAPI.autoStop();
-        log(`?? Auto campaign stopped (saved)`, 'warning');
+        log(`Auto campaign stopped (saved)`, 'warning');
         await refreshAutoStatus();
       } catch (e) {
         log(`Auto stop failed: ${e.message}`, 'error');
@@ -1646,7 +1646,7 @@
               return `<div class="log-entry log-error">[${escapeHtml(ts)}] ? FAILED | from ${escapeHtml(ev.from || "")} ? ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "campaign_completed") {
-              return `<div class="log-entry log-info">[${escapeHtml(ts)}] ?? CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;
+              return `<div class="log-entry log-info">[${escapeHtml(ts)}] CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;
             }
             return `<div class="log-entry log-info">[${escapeHtml(ts)}] ${escapeHtml(JSON.stringify(ev))}</div>`;
           }).join("");
@@ -1747,7 +1747,7 @@
   function log(message, type = 'info') {
   const logArea = document.getElementById('logArea');
 
-  // ?? SAFETY GUARD (this fixes everything)
+  // Safety guard
   if (!logArea) {
     console.warn('[LOG SKIPPED]', message);
     return;
