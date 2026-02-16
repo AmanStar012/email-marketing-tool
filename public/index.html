@@ -958,7 +958,7 @@
             <div class="section-title">Email Template</div>
           </div>
           <label class="form-label">Campaign Name</label>
-          <input class="form-control" id="campaignName" placeholder="Example: Amazon February 2026" />
+          <input class="form-control" id="campaignName" placeholder="" />
 
           <label class="form-label">Brands</label>
           <textarea class="form-control form-control-textarea" id="brandName" rows="3"
@@ -1032,10 +1032,10 @@
           <div class="auto-panel" style="margin-top:14px">
             <h4>Campaign Report</h4>
             <div class="auto-row" style="margin-bottom:10px">
-              <input type="text" class="form-control" id="reportCampaignSearch" placeholder="Search campaign..." />
+              <input type="text" class="form-control" id="reportCampaignSearch" list="reportCampaignList" placeholder="Search campaign..." />
+              <datalist id="reportCampaignList"></datalist>
               <input type="date" class="form-control" id="reportFromDate" />
               <input type="date" class="form-control" id="reportToDate" />
-              <button class="btn btn-secondary" id="reportLoadBtn">Load</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
@@ -1089,7 +1089,10 @@
       emailAccounts: [],
       autoCampaignId: null,
       stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 },
-      reportRows: []
+      reportRows: [],
+      reportLoadTimer: null,
+      campaignMetaByName: {},
+      isAutoSettingReportDates: false
     };
 
     // API Client
@@ -1160,6 +1163,17 @@
         if (!response.ok) throw new Error(result.error || 'Failed to fetch campaign report');
         return result;
       }
+
+      async getCampaignNames(params = {}) {
+        const query = new URLSearchParams();
+        if (params.fromDate) query.set('fromDate', params.fromDate);
+        if (params.toDate) query.set('toDate', params.toDate);
+        const qs = query.toString();
+        const response = await fetch(`${this.baseURL}/api/report-campaigns${qs ? `?${qs}` : ''}`);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to fetch campaign names');
+        return result;
+      }
     }
 
     const emailAPI = new EmailMarketingAPI();
@@ -1177,6 +1191,7 @@
       updateStats();
       refreshAutoStatus();
       initializeReportFilters();
+      ensureCampaignNameOptions().catch(() => { });
       loadCampaignReport().catch(() => { });
       log('UI ready. Auto available.', 'info');
 
@@ -1213,11 +1228,6 @@
           handler: cleanupRedisData
         },
         {
-          id: "reportLoadBtn",
-          event: "click",
-          handler: loadCampaignReport
-        },
-        {
           id: "reportCsvBtn",
           event: "click",
           handler: downloadCampaignReportCsv
@@ -1244,11 +1254,11 @@
         const el = document.getElementById(id);
         if (!el) return;
         if (id === 'reportCampaignSearch') {
-          el.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') loadCampaignReport();
-          });
+          el.addEventListener('focus', () => ensureCampaignNameOptions());
+          el.addEventListener('input', () => scheduleReportLoad());
+          el.addEventListener('change', () => onCampaignSearchChanged());
         } else {
-          el.addEventListener('change', () => loadCampaignReport());
+          el.addEventListener('change', () => onReportDateChanged());
         }
       });
 
@@ -1262,13 +1272,10 @@
     }
 
     function initializeReportFilters() {
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
       const fromEl = document.getElementById('reportFromDate');
       const toEl = document.getElementById('reportToDate');
-      if (fromEl && !fromEl.value) fromEl.value = toDateInputValue(monthStart);
-      if (toEl && !toEl.value) toEl.value = toDateInputValue(now);
+      if (fromEl && !fromEl.value) fromEl.value = '';
+      if (toEl && !toEl.value) toEl.value = '';
     }
 
     function initializeUploadZone() {
@@ -1585,6 +1592,9 @@
 
         const result = await emailAPI.cleanupRedis();
         log(`Redis cleanup complete. Deleted keys: ${result.totalDeleted}`, 'success');
+        state.campaignMetaByName = {};
+        const listEl = document.getElementById('reportCampaignList');
+        if (listEl) listEl.innerHTML = '';
         await refreshAutoStatus();
         await loadAccountsFromBackend();
         await loadCampaignReport();
@@ -1750,6 +1760,39 @@
       }
     }
 
+    function scheduleReportLoad() {
+      if (state.reportLoadTimer) clearTimeout(state.reportLoadTimer);
+      state.reportLoadTimer = setTimeout(() => {
+        loadCampaignReport();
+      }, 250);
+    }
+
+    async function onReportDateChanged() {
+      if (state.isAutoSettingReportDates) return;
+      await ensureCampaignNameOptions();
+      scheduleReportLoad();
+    }
+
+    async function onCampaignSearchChanged() {
+      await ensureCampaignNameOptions();
+
+      const campaignValue = (document.getElementById('reportCampaignSearch')?.value || '').trim();
+      const fromEl = document.getElementById('reportFromDate');
+      const toEl = document.getElementById('reportToDate');
+      const fromDate = fromEl?.value || '';
+      const toDate = toEl?.value || '';
+      const meta = state.campaignMetaByName[campaignValue];
+
+      if (meta && !fromDate && !toDate && fromEl && toEl) {
+        state.isAutoSettingReportDates = true;
+        fromEl.value = meta.startDate || '';
+        toEl.value = meta.endDate || '';
+        state.isAutoSettingReportDates = false;
+      }
+
+      scheduleReportLoad();
+    }
+
     async function loadCampaignReport() {
       const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
       const fromDate = document.getElementById('reportFromDate')?.value || '';
@@ -1787,6 +1830,34 @@
         if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">Failed to load report</td></tr>`;
         if (summaryEl) summaryEl.textContent = `Error: ${e.message}`;
         log(`Report load failed: ${e.message}`, 'error');
+      }
+    }
+
+    async function ensureCampaignNameOptions() {
+      const listEl = document.getElementById('reportCampaignList');
+      if (!listEl) return;
+
+      try {
+        const fromDate = document.getElementById('reportFromDate')?.value || '';
+        const toDate = document.getElementById('reportToDate')?.value || '';
+        const result = await emailAPI.getCampaignNames({ fromDate, toDate });
+        const campaigns = Array.isArray(result.campaigns) ? result.campaigns : [];
+
+        state.campaignMetaByName = {};
+        campaigns.forEach((c) => {
+          const name = String(c?.name || '').trim();
+          if (!name) return;
+          state.campaignMetaByName[name] = {
+            startDate: String(c?.startDate || ''),
+            endDate: String(c?.endDate || '')
+          };
+        });
+
+        listEl.innerHTML = campaigns
+          .map(c => `<option value="${escapeHtml(c.name)}"></option>`)
+          .join('');
+      } catch (e) {
+        log(`Failed to load campaign names: ${e.message}`, 'warning');
       }
     }
 
