@@ -9,7 +9,8 @@
 
     "api/auto-start.js": { "maxDuration": 30, "memory": 1024 },
     "api/auto-stop.js": { "maxDuration": 15, "memory": 512 },
-    "api/auto-status.js": { "maxDuration": 15, "memory": 512 }
+    "api/auto-status.js": { "maxDuration": 15, "memory": 512 },
+    "api/report-campaign.js": { "maxDuration": 30, "memory": 1024 }
   },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },

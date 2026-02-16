@@ -957,6 +957,9 @@
             <div class="section-icon"></div>
             <div class="section-title">Email Template</div>
           </div>
+          <label class="form-label">Campaign Name</label>
+          <input class="form-control" id="campaignName" placeholder="Example: Amazon February 2026" />
+
           <label class="form-label">Brands</label>
           <textarea class="form-control form-control-textarea" id="brandName" rows="3"
             placeholder="Enter one brand per line&#10;Amazon&#10;Flipkart&#10;Myntra">
@@ -1025,6 +1028,35 @@
             </div>
 
           </div>
+
+          <div class="auto-panel" style="margin-top:14px">
+            <h4>Campaign Report</h4>
+            <div class="auto-row" style="margin-bottom:10px">
+              <input type="text" class="form-control" id="reportCampaignSearch" placeholder="Search campaign..." />
+              <input type="date" class="form-control" id="reportFromDate" />
+              <input type="date" class="form-control" id="reportToDate" />
+              <button class="btn btn-secondary" id="reportLoadBtn">Load</button>
+              <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
+            </div>
+            <div class="mini" id="reportSummary">No report loaded</div>
+            <div class="table-wrap" style="margin-top:10px;max-height:260px">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Campaign</th>
+                    <th>Date</th>
+                    <th>Sender Email</th>
+                    <th>Sent</th>
+                  </tr>
+                </thead>
+                <tbody id="reportBody">
+                  <tr>
+                    <td colspan="4" class="mini">No data</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1056,7 +1088,8 @@
       contacts: [],
       emailAccounts: [],
       autoCampaignId: null,
-      stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 }
+      stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 },
+      reportRows: []
     };
 
     // API Client
@@ -1116,6 +1149,17 @@
         if (!response.ok) throw new Error(result.error || 'Failed to fetch auto status');
         return result;
       }
+
+      async getCampaignReport(params = {}) {
+        const query = new URLSearchParams();
+        if (params.campaignQuery) query.set('campaignQuery', params.campaignQuery);
+        if (params.fromDate) query.set('fromDate', params.fromDate);
+        if (params.toDate) query.set('toDate', params.toDate);
+        const response = await fetch(`${this.baseURL}/api/report-campaign?${query.toString()}`);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to fetch campaign report');
+        return result;
+      }
     }
 
     const emailAPI = new EmailMarketingAPI();
@@ -1132,6 +1176,8 @@
       updateMergeFields([]);
       updateStats();
       refreshAutoStatus();
+      initializeReportFilters();
+      loadCampaignReport().catch(() => { });
       log('UI ready. Auto available.', 'info');
 
       setInterval(() => {
@@ -1166,6 +1212,16 @@
           event: "click",
           handler: cleanupRedisData
         },
+        {
+          id: "reportLoadBtn",
+          event: "click",
+          handler: loadCampaignReport
+        },
+        {
+          id: "reportCsvBtn",
+          event: "click",
+          handler: downloadCampaignReportCsv
+        },
       ];
 
       // Button / file bindings
@@ -1178,10 +1234,22 @@
         el.addEventListener(event, handler);
       });
 
-      ['brandName', 'subjectLine', 'emailContent'].forEach(id => {
+      ['campaignName', 'brandName', 'subjectLine', 'emailContent'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('input', saveTemplateToLocalStorage);
+      });
+
+      ['reportCampaignSearch', 'reportFromDate', 'reportToDate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (id === 'reportCampaignSearch') {
+          el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loadCampaignReport();
+          });
+        } else {
+          el.addEventListener('change', () => loadCampaignReport());
+        }
       });
 
       const search = document.getElementById('accountSearch');
@@ -1191,6 +1259,16 @@
 
       injectEditorToolbar();
       enableEditorShortcuts();
+    }
+
+    function initializeReportFilters() {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const fromEl = document.getElementById('reportFromDate');
+      const toEl = document.getElementById('reportToDate');
+      if (fromEl && !fromEl.value) fromEl.value = toDateInputValue(monthStart);
+      if (toEl && !toEl.value) toEl.value = toDateInputValue(now);
     }
 
     function initializeUploadZone() {
@@ -1452,19 +1530,21 @@
       const brandRaw = document.getElementById('brandName')?.value || '';
       const subjectRaw = document.getElementById('subjectLine')?.value || '';
       const contentRaw = document.getElementById('emailContent')?.value || '';
+      const campaignName = (document.getElementById('campaignName')?.value || '').trim();
 
       const brands = brandRaw.split('\n').map(v => v.trim()).filter(Boolean);
       const subjects = subjectRaw.split('\n').map(v => v.trim()).filter(Boolean);
       const bodies = contentRaw.split('---').map(v => v.trim()).filter(Boolean);
 
-      if (!brands.length || !subjects.length || !bodies.length) {
-        log('Brand, subject, and body are required', 'error');
+      if (!campaignName || !brands.length || !subjects.length || !bodies.length) {
+        log('Campaign name, brand, subject, and body are required', 'error');
         return;
       }
 
       const contacts = state.contacts.map(c => normalizeContactEmailKey(c));
 
       const payload = {
+        campaignName,
         contacts,
         brandName: brands,
         template: {
@@ -1507,6 +1587,7 @@
         log(`Redis cleanup complete. Deleted keys: ${result.totalDeleted}`, 'success');
         await refreshAutoStatus();
         await loadAccountsFromBackend();
+        await loadCampaignReport();
       } catch (e) {
         log(`Redis cleanup failed: ${e.message}`, 'error');
       } finally {
@@ -1551,6 +1632,7 @@
 
         box.innerHTML = `
         Auto Status: ${statusPill}<br>
+        Name: <strong>${escapeHtml(c.campaignName || '—')}</strong><br>
         Campaign: <strong>${escapeHtml(c.id)}</strong><br>
         Progress: <strong>${cursor}/${total}</strong> (${percent}%)<br>
         Updated: ${new Date(c.updatedAt).toLocaleString()}
@@ -1668,6 +1750,75 @@
       }
     }
 
+    async function loadCampaignReport() {
+      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
+      const fromDate = document.getElementById('reportFromDate')?.value || '';
+      const toDate = document.getElementById('reportToDate')?.value || '';
+      const summaryEl = document.getElementById('reportSummary');
+      const bodyEl = document.getElementById('reportBody');
+
+      try {
+        if (summaryEl) summaryEl.textContent = 'Loading...';
+        const result = await emailAPI.getCampaignReport({ campaignQuery: search, fromDate, toDate });
+        const rows = Array.isArray(result.rows) ? result.rows : [];
+        state.reportRows = rows;
+
+        if (!bodyEl) return;
+        if (!rows.length) {
+          bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
+          if (summaryEl) summaryEl.textContent = 'No report rows found for selected filters';
+          return;
+        }
+
+        bodyEl.innerHTML = rows.map(r => `
+          <tr>
+            <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
+            <td>${escapeHtml(r.date || '')}</td>
+            <td>${escapeHtml(r.senderEmail || '')}</td>
+            <td><strong>${Number(r.sent || 0)}</strong></td>
+          </tr>
+        `).join('');
+
+        const totals = result.totals || {};
+        if (summaryEl) {
+          summaryEl.textContent = `Rows: ${Number(totals.totalRows || rows.length)} | Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
+        }
+      } catch (e) {
+        if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">Failed to load report</td></tr>`;
+        if (summaryEl) summaryEl.textContent = `Error: ${e.message}`;
+        log(`Report load failed: ${e.message}`, 'error');
+      }
+    }
+
+    function downloadCampaignReportCsv() {
+      if (!Array.isArray(state.reportRows) || state.reportRows.length === 0) {
+        log('No report data to download', 'warning');
+        return;
+      }
+
+      const headers = ['Campaign', 'Date', 'Sender Email', 'Sent'];
+      const lines = [headers.join(',')];
+      for (const row of state.reportRows) {
+        const values = [
+          row.campaignName || row.campaignKey || '',
+          row.date || '',
+          row.senderEmail || '',
+          String(Number(row.sent || 0))
+        ];
+        lines.push(values.map(csvEscape).join(','));
+      }
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `campaign-report-${toDateInputValue(new Date())}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
     function updateStatsFromLocalCsvOnly() {
       const csvTotal = state.contacts.length || 0;
       state.stats.totalSent = 0;
@@ -1705,6 +1856,7 @@
 
     function saveTemplateToLocalStorage() {
       const data = {
+        campaignName: document.getElementById('campaignName')?.value || '',
         brandRaw: document.getElementById('brandName')?.value || '',
         subjectRaw: document.getElementById('subjectLine')?.value || '',
         contentRaw: document.getElementById('emailContent')?.value || ''
@@ -1722,6 +1874,9 @@
 
       try {
         const data = JSON.parse(raw);
+
+        if (document.getElementById('campaignName'))
+          document.getElementById('campaignName').value = data.campaignName || '';
 
         if (document.getElementById('brandName'))
           document.getElementById('brandName').value = data.brandRaw || '';
@@ -1764,6 +1919,22 @@
   const entries = logArea.querySelectorAll('.log-entry');
   if (entries.length > 120) entries[0].remove();
 }
+
+    function csvEscape(value) {
+      const str = String(value ?? '');
+      if (/[",\n]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }
+
+    function toDateInputValue(d) {
+      const date = new Date(d);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
 
 
     function formatFileSize(bytes) {

@@ -37,6 +37,28 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function indiaDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function campaignSlug(name) {
+  const base = String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || "campaign";
+}
+
+function senderKey(email) {
+  return encodeURIComponent(String(email || "").trim().toLowerCase());
+}
+
 function getIndiaHour() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Kolkata",
@@ -74,6 +96,8 @@ function isWithinIndiaSendWindow() {
     const liveKey = `auto:campaign:${activeId}:live`;
 
     const campaign = await redisGet(campaignKey);
+    const campaignName = String(campaign?.campaignName || campaign?.id || "campaign");
+    const campaignKeySlug = campaignSlug(campaignName);
     if (!campaign || campaign.status !== "running") {
       console.log("ℹ️ Campaign not running");
       process.exit(0);
@@ -239,6 +263,13 @@ function isWithinIndiaSendWindow() {
               if (stats.byAccount[accId].failed > 0) stats.byAccount[accId].failed--;
             }
             await redisSet(statsKey, stats);
+
+            const reportDate = indiaDateKey();
+            const reportSender = senderKey(account.email);
+            const reportKey = `report:campaign:${campaignKeySlug}:daily:${reportDate}:sender:${reportSender}`;
+            const currentSenderCount = Number(await redisGet(reportKey)) || 0;
+            await redisSet(reportKey, currentSenderCount + 1);
+            await redisSet(`report:campaign:${campaignKeySlug}:name`, campaignName);
 
             const ev = (await redisGet(eventsKey)) || [];
             ev.push({

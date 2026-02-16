@@ -22,7 +22,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const now = Date.now();
-    const { contacts, brandName, template } = req.body || {};
+    const { contacts, brandName, template, campaignName } = req.body || {};
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
       return res.status(400).json({ success: false, error: "contacts is required" });
@@ -51,6 +51,11 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    const campaignNameValue = String(campaignName || "").trim();
+    if (!campaignNameValue) {
+      return res.status(400).json({ success: false, error: "campaignName is required" });
+    }
+
     /**
      * ===============================
      * 🔁 RESUME ONLY IF SAME CONTACTS
@@ -68,6 +73,7 @@ module.exports = async function handler(req, res) {
       ) {
         lastCampaign.status = "running";
         lastCampaign.updatedAt = now;
+        lastCampaign.campaignName = campaignNameValue;
 
         await redisSet(`auto:campaign:${lastId}`, lastCampaign);
         await redisSet("auto:campaign:active", lastId);
@@ -110,6 +116,7 @@ module.exports = async function handler(req, res) {
       contacts,
       brandName,
       template,
+      campaignName: campaignNameValue,
       cursor: 0,
       total: contacts.length,
       createdAt: now,
