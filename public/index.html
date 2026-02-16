@@ -1037,6 +1037,7 @@
               <input type="date" class="form-control" id="reportFromDate" />
               <input type="date" class="form-control" id="reportToDate" />
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
+              <button class="btn btn-secondary" id="reportFailureCsvBtn">Download Permanent Failures CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
             <div class="table-wrap" style="margin-top:10px;max-height:260px">
@@ -1174,6 +1175,25 @@
         if (!response.ok) throw new Error(result.error || 'Failed to fetch campaign names');
         return result;
       }
+
+      async getPermanentFailuresCsv(params = {}) {
+        const query = new URLSearchParams();
+        if (params.campaignQuery) query.set('campaignQuery', params.campaignQuery);
+        if (params.fromDate) query.set('fromDate', params.fromDate);
+        if (params.toDate) query.set('toDate', params.toDate);
+        const response = await fetch(`${this.baseURL}/api/report-permanent-failures-csv?${query.toString()}`);
+        if (!response.ok) {
+          let msg = 'Failed to download permanent failures CSV';
+          try {
+            const err = await response.json();
+            msg = err.error || msg;
+          } catch (_) {
+            // no-op
+          }
+          throw new Error(msg);
+        }
+        return response.blob();
+      }
     }
 
     const emailAPI = new EmailMarketingAPI();
@@ -1231,6 +1251,11 @@
           id: "reportCsvBtn",
           event: "click",
           handler: downloadCampaignReportCsv
+        },
+        {
+          id: "reportFailureCsvBtn",
+          event: "click",
+          handler: downloadPermanentFailuresCsv
         },
       ];
 
@@ -1888,6 +1913,32 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+
+    async function downloadPermanentFailuresCsv() {
+      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
+      const fromDate = document.getElementById('reportFromDate')?.value || '';
+      const toDate = document.getElementById('reportToDate')?.value || '';
+
+      try {
+        const blob = await emailAPI.getPermanentFailuresCsv({
+          campaignQuery: search,
+          fromDate,
+          toDate
+        });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `permanent-failures-${toDateInputValue(new Date())}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        log('Permanent failures CSV downloaded', 'success');
+      } catch (e) {
+        log(`Permanent failures CSV failed: ${e.message}`, 'error');
+      }
     }
 
     function updateStatsFromLocalCsvOnly() {
