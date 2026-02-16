@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -143,16 +143,7 @@
     }
 
     .section-icon {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, #3498db, #2980b9);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 18px;
-      font-weight: 600
+      display: none
     }
 
     .section-title {
@@ -409,16 +400,6 @@
       background: linear-gradient(135deg, #f8d7da, #f5c6cb)
     }
 
-    .active-account {
-      border: 2px solid #27ae60 !important;
-      background: linear-gradient(135deg, #d1e7dd, #c3e6cb) !important;
-      box-shadow: 0 0 15px rgba(39, 174, 96, .3)
-    }
-
-    .active-account .account-email {
-      font-weight: bold;
-      color: #155724
-    }
 
     .account-header {
       display: flex;
@@ -835,12 +816,6 @@
       background: linear-gradient(135deg, rgba(239, 68, 68, .15), rgba(127, 29, 29, .1))
     }
 
-    .active-account {
-      border: 2px solid rgba(34, 197, 94, .8) !important;
-      background: linear-gradient(135deg, rgba(34, 197, 94, .18), rgba(15, 118, 110, .12)) !important;
-      box-shadow: 0 0 15px rgba(34, 197, 94, .25)
-    }
-
     .status-connected {
       background: rgba(34, 197, 94, .2);
       color: #86efac
@@ -928,7 +903,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>🚀 Email Marketing Pro</h1>
+      <h1>?? Email Marketing Pro</h1>
       <p>Auto Campaign</p>
       <div class="stats-grid">
         <div class="stat-card">
@@ -956,20 +931,20 @@
         <!-- Upload Contacts -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">1</div>
+            <div class="section-icon"></div>
             <div class="section-title">Upload Contacts</div>
           </div>
           <div class="upload-zone" id="uploadZone">
-            <div class="upload-icon">📋</div>
+            <div class="upload-icon">??</div>
             <div class="upload-text">Drop your CSV file here</div>
             <div class="upload-subtitle">or click to browse</div>
             <input type="file" id="csvInput" accept=".csv" style="display:none;">
             <button class="btn btn-small" onclick="document.getElementById('csvInput').click()">
-              📁 Choose File
+              ?? Choose File
             </button>
           </div>
           <div class="contacts-preview" id="contactsPreview" style="display:none;">
-            <h3>📊 Contacts Preview</h3>
+            <h3>?? Contacts Preview</h3>
             <div class="mini" id="csvCountLabel">CSV Emails: 0</div>
             <div style="height:10px"></div>
             <div id="contactsList"></div>
@@ -979,7 +954,7 @@
         <!-- Email Template + Auto -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">2</div>
+            <div class="section-icon"></div>
             <div class="section-title">Email Template</div>
           </div>
           <label class="form-label">Brands</label>
@@ -1005,20 +980,21 @@
 
           <div class="auto-box">
             <div class="auto-row">
-              <button class="btn btn-success" id="autoStartBtn">⏱️ Start Auto Campaign</button>
-              <button class="btn btn-danger" id="autoStopBtn">🛑 Stop Auto Campaign</button>
+              <button class="btn btn-success" id="autoStartBtn">?? Start Auto Campaign</button>
+              <button class="btn btn-danger" id="autoStopBtn">?? Stop Auto Campaign</button>
+              <button class="btn btn-secondary" id="cleanupRedisBtn">Clean Redis Data</button>
             </div>
 
             <div class="auto-status" id="autoStatusBox">Auto Status: (loading...)</div>
 
             <div class="auto-panels">
               <div class="auto-panel">
-                <h4>📨 Current Sender (Live)</h4>
+                <h4>?? Current Sender (Live)</h4>
                 <div id="autoLiveBox" class="mini">—</div>
               </div>
 
               <div class="auto-panel">
-                <h4>📊 Per-Account Stats</h4>
+                <h4>?? Per-Account Stats</h4>
                 <div class="table-wrap">
                   <table id="autoStatsTable">
                     <thead>
@@ -1041,7 +1017,7 @@
               </div>
 
               <div class="auto-panel">
-                <h4>🕒 Latest Send Events</h4>
+                <h4>?? Latest Send Events</h4>
                 <div class="log-area" id="autoEventsLog" style="max-height:220px;background:#111827">
                   <div class="log-entry log-info">No events yet</div>
                 </div>
@@ -1057,7 +1033,7 @@
         <!-- Email Accounts -->
         <div class="section">
           <div class="section-header">
-            <div class="section-icon">3</div>
+            <div class="section-icon"></div>
             <div class="section-title">Email Accounts</div>
           </div>
           <div class="email-accounts-toolbar">
@@ -1121,6 +1097,19 @@
         return result;
       }
 
+      async cleanupRedis() {
+        const response = await fetch(`${this.baseURL}/api/cleanup-redis`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({})
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to cleanup redis data');
+        return result;
+      }
+
       async autoStatus() {
         const response = await fetch(`${this.baseURL}/api/auto-status`);
         const result = await response.json();
@@ -1171,6 +1160,11 @@
           id: "autoStopBtn",
           event: "click",
           handler: stopAutoCampaign
+        },
+        {
+          id: "cleanupRedisBtn",
+          event: "click",
+          handler: cleanupRedisData
         },
       ];
 
@@ -1230,10 +1224,9 @@
     async function loadAccountsFromBackend() {
       try {
         const accounts = await emailAPI.getAccounts();
-        state.emailAccounts = accounts.map((a, idx) => ({
+        state.emailAccounts = accounts.map((a) => ({
           ...a,
-          provider: `Gmail Account ${a.id}`,
-          active: idx === 0
+          provider: `Gmail Account ${a.id}`
         }));
         renderEmailAccounts();
         log(`Loaded ${state.emailAccounts.length} accounts from backend`, 'success');
@@ -1275,7 +1268,7 @@
         updateMergeFields(headers);
         document.getElementById('csvCountLabel').textContent = `CSV Emails: ${state.contacts.length}`;
         updateStatsFromLocalCsvOnly();
-        log(`✅ Loaded ${state.contacts.length} contacts`, 'success');
+        log(`? Loaded ${state.contacts.length} contacts`, 'success');
       } catch (e) {
         log(`CSV parse error: ${e.message}`, 'error');
       }
@@ -1406,25 +1399,21 @@
         })
         .forEach(account => {
         const accountDiv = document.createElement('div');
-        accountDiv.className = `email-account ${account.connected ? 'connected' : 'disconnected'} ${account.active ? 'active-account' : ''}`;
+        accountDiv.className = `email-account ${account.connected ? 'connected' : 'disconnected'}`;
         accountDiv.innerHTML = `
         <div class="account-header">
           <div>
             <div class="account-email">
-              ${account.active ? '🟢' : '⚪'} ${escapeHtml(account.email)}
+              ${escapeHtml(account.email)}
             </div>
             <div class="account-provider">Sender: <strong>${escapeHtml(account.senderName || '')}</strong></div>
             ${account.lastError ? `<div class="account-provider" style="color:#b00020;">Last error: ${escapeHtml(account.lastError)}</div>` : ''}
           </div>
           <div class="status-badge ${account.connected ? 'status-connected' : 'status-disconnected'}">
-            ${account.connected ? '✅ Connected' : '❌ Disconnected'}
+            ${account.connected ? '? Connected' : '? Disconnected'}
           </div>
         </div>
         <div class="account-actions">
-          <button class="btn btn-small ${account.active ? 'btn-success' : 'btn-secondary'}"
-                  onclick="setActiveAccount(${account.id})">
-            ${account.active ? '🟢 Primary' : '⚪ Set Primary'}
-          </button>
           <button class="btn btn-small ${account.connected ? 'btn-danger' : 'btn-success'}"
                   onclick="toggleConnection(${account.id})">
             ${account.connected ? 'Disconnect' : 'Connect'}
@@ -1433,16 +1422,6 @@
       `;
         container.appendChild(accountDiv);
       });
-    }
-
-    function setActiveAccount(accountId) {
-      state.emailAccounts.forEach(a => a.active = false);
-      const selected = state.emailAccounts.find(a => a.id === accountId);
-      if (selected) {
-        selected.active = true;
-        log(`🎯 Primary set: ${selected.email}`, 'info');
-      }
-      renderEmailAccounts();
     }
 
     async function toggleConnection(accountId) {
@@ -1460,7 +1439,8 @@
       } catch (e) {
         log(`Failed to change status: ${e.message}`, 'error');
       }
-    }
+    }
+
 
     async function startAutoCampaign() {
 
@@ -1508,10 +1488,30 @@
     async function stopAutoCampaign() {
       try {
         await emailAPI.autoStop();
-        log(`🛑 Auto campaign stopped (saved)`, 'warning');
+        log(`?? Auto campaign stopped (saved)`, 'warning');
         await refreshAutoStatus();
       } catch (e) {
         log(`Auto stop failed: ${e.message}`, 'error');
+      }
+    }
+
+    async function cleanupRedisData() {
+      const ok = confirm('This will clear all project data from Redis and make storage fresh. Continue?');
+      if (!ok) return;
+
+      try {
+        const btn = document.getElementById('cleanupRedisBtn');
+        if (btn) btn.disabled = true;
+
+        const result = await emailAPI.cleanupRedis();
+        log(`Redis cleanup complete. Deleted keys: ${result.totalDeleted}`, 'success');
+        await refreshAutoStatus();
+        await loadAccountsFromBackend();
+      } catch (e) {
+        log(`Redis cleanup failed: ${e.message}`, 'error');
+      } finally {
+        const btn = document.getElementById('cleanupRedisBtn');
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -1640,20 +1640,20 @@
             ].filter(Boolean);
             const detailText = detailParts.length ? ` | ${detailParts.join(" | ")}` : "";
             if (ev.status === "sent") {
-              return `<div class="log-entry log-success">[${escapeHtml(ts)}] ✅ SENT | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")}${escapeHtml(detailText)}</div>`;
+              return `<div class="log-entry log-success">[${escapeHtml(ts)}] ? SENT | from ${escapeHtml(ev.from || "")} ? ${escapeHtml(ev.to || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "failed") {
-              return `<div class="log-entry log-error">[${escapeHtml(ts)}] ❌ FAILED | from ${escapeHtml(ev.from || "")} → ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
+              return `<div class="log-entry log-error">[${escapeHtml(ts)}] ? FAILED | from ${escapeHtml(ev.from || "")} ? ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "campaign_completed") {
-              return `<div class="log-entry log-info">[${escapeHtml(ts)}] 🏁 CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;
+              return `<div class="log-entry log-info">[${escapeHtml(ts)}] ?? CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;
             }
             return `<div class="log-entry log-info">[${escapeHtml(ts)}] ${escapeHtml(JSON.stringify(ev))}</div>`;
           }).join("");
           eventsLog.scrollTop = eventsLog.scrollHeight;
         }
 
-        // ✅ Update header stats using auto stats + campaign cursor
+        // ? Update header stats using auto stats + campaign cursor
         const inQueue = Math.max(0, total - cursor);
         const successRate = (totalSent + totalFailed) > 0 ? Math.round((totalSent / (totalSent + totalFailed)) * 100) : 0;
 
@@ -1680,7 +1680,9 @@
         progressEl.style.width = '0%';
       }
 
-    }
+    }
+
+
 
     function personalizeTemplate(template, vars) {
       if (!template || typeof template !== 'string') return template;
@@ -1698,7 +1700,8 @@
     function normalizeContactEmailKey(contact) {
       const email = getContactEmail(contact);
       return { ...contact, email };
-    }
+    }
+
 
     function saveTemplateToLocalStorage() {
       const data = {
@@ -1731,7 +1734,8 @@
       } catch (e) {
         console.warn("Failed to restore template state", e);
       }
-    }
+    }
+
 
     function updateStats() {
       document.getElementById('totalSent').textContent = state.stats.totalSent;
@@ -1743,7 +1747,7 @@
   function log(message, type = 'info') {
   const logArea = document.getElementById('logArea');
 
-  // 🔒 SAFETY GUARD (this fixes everything)
+  // ?? SAFETY GUARD (this fixes everything)
   if (!logArea) {
     console.warn('[LOG SKIPPED]', message);
     return;
@@ -1896,12 +1900,13 @@
       saveTemplateToLocalStorage();
     }
 
-    window.setActiveAccount = setActiveAccount;
     window.toggleConnection = toggleConnection;
   </script>
 </body>
 
 </html>
+
+
 
 
 

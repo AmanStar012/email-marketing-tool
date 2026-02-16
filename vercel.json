@@ -5,6 +5,7 @@
 
     "api/accounts.js": { "maxDuration": 15, "memory": 512 },
     "api/accounts-set-status.js": { "maxDuration": 15, "memory": 512 },
+    "api/cleanup-redis.js": { "maxDuration": 30, "memory": 512 },
 
     "api/auto-start.js": { "maxDuration": 30, "memory": 1024 },
     "api/auto-stop.js": { "maxDuration": 15, "memory": 512 },
