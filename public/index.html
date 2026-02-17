@@ -1064,25 +1064,6 @@
                 <thead>
                   <tr>
                     <th>Campaign</th>
-                    <th>Sent</th>
-                    <th>Replies</th>
-                    <th>No Reply</th>
-                    <th>Reply %</th>
-                  </tr>
-                </thead>
-                <tbody id="replyCampaignBody">
-                  <tr>
-                    <td colspan="5" class="mini">No data</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div class="table-wrap" style="margin-top:10px;max-height:220px">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Campaign</th>
                     <th>Sender Email</th>
                     <th>Sent</th>
                     <th>Replies</th>
@@ -1923,7 +1904,6 @@
 
     function renderReplyAnalytics(replyResult) {
       const summaryEl = document.getElementById('replySummary');
-      const campaignBody = document.getElementById('replyCampaignBody');
       const senderBody = document.getElementById('replySenderBody');
 
       const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
@@ -1931,7 +1911,6 @@
       const fromDate = document.getElementById('reportFromDate')?.value || '';
       const toDate = document.getElementById('reportToDate')?.value || '';
 
-      const sentByCampaign = {};
       const sentBySender = {};
       for (const row of state.reportRows || []) {
         const campaignName = String(row.campaignName || row.campaignKey || '').trim();
@@ -1939,12 +1918,10 @@
         const sent = Number(row.sent || 0);
         if (!campaignName || !senderEmail || sent <= 0) continue;
 
-        sentByCampaign[campaignName] = (sentByCampaign[campaignName] || 0) + sent;
         const senderKey = `${campaignName}|${senderEmail}`;
         sentBySender[senderKey] = (sentBySender[senderKey] || 0) + sent;
       }
 
-      const repliesByCampaign = {};
       const repliesBySender = {};
       for (const ev of repliedEvents) {
         const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
@@ -1954,19 +1931,9 @@
         if (toDate && d > toDate) continue;
         if (!campaignName || !senderEmail) continue;
 
-        repliesByCampaign[campaignName] = (repliesByCampaign[campaignName] || 0) + 1;
         const senderKey = `${campaignName}|${senderEmail}`;
         repliesBySender[senderKey] = (repliesBySender[senderKey] || 0) + 1;
       }
-
-      const campaignNames = Object.keys(sentByCampaign);
-      const campaigns = campaignNames.map((name) => {
-        const totalSent = Number(sentByCampaign[name] || 0);
-        const totalReplies = Number(repliesByCampaign[name] || 0);
-        const noReply = Math.max(0, totalSent - totalReplies);
-        const replyPercent = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
-        return { campaignName: name, totalSent, totalReplies, noReply, replyPercent };
-      }).sort((a, b) => b.totalSent - a.totalSent);
 
       const senders = Object.keys(sentBySender).map((key) => {
         const splitAt = key.indexOf("|");
@@ -1979,11 +1946,11 @@
         return { campaignName, senderEmail, sent, replies, noReply, replyPercent };
       }).sort((a, b) => b.sent - a.sent);
 
-      state.replyCampaignRows = campaigns;
+      state.replyCampaignRows = [];
       state.replySenderRows = senders;
 
-      const totalSent = campaigns.reduce((n, r) => n + Number(r.totalSent || 0), 0);
-      const totalReplies = campaigns.reduce((n, r) => n + Number(r.totalReplies || 0), 0);
+      const totalSent = senders.reduce((n, r) => n + Number(r.sent || 0), 0);
+      const totalReplies = senders.reduce((n, r) => n + Number(r.replies || 0), 0);
       const noReply = Math.max(0, totalSent - totalReplies);
       const replyPercent = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
 
@@ -1993,23 +1960,7 @@
         lastScanText = `${new Date(lastScannedAt).toLocaleString()} (${daysAgo} day(s) ago)`;
       }
       if (summaryEl) {
-        summaryEl.textContent = `Reply Analytics | Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${noReply} | Reply %: ${replyPercent}% | Last Scan: ${lastScanText}`;
-      }
-
-      if (campaignBody) {
-        if (!campaigns.length) {
-          campaignBody.innerHTML = `<tr><td colspan="5" class="mini">No data</td></tr>`;
-        } else {
-          campaignBody.innerHTML = campaigns.map((r) => `
-            <tr>
-              <td>${escapeHtml(r.campaignName || '')}</td>
-              <td><strong>${Number(r.totalSent || 0)}</strong></td>
-              <td>${Number(r.totalReplies || 0)}</td>
-              <td>${Number(r.noReply || 0)}</td>
-              <td>${Number(r.replyPercent || 0)}%</td>
-            </tr>
-          `).join('');
-        }
+        summaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${noReply} | Reply %: ${replyPercent}%`;
       }
 
       if (senderBody) {
