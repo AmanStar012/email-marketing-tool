@@ -549,6 +549,15 @@
       align-items: center
     }
 
+    .report-filter-row {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .report-filter-row .form-control {
+      min-width: 180px;
+    }
+
     .auto-status {
       font-size: 13px;
       color: #444;
@@ -1031,13 +1040,13 @@
 
           <div class="auto-panel" style="margin-top:14px">
             <h4>Campaign Report</h4>
-            <div class="auto-row" style="margin-bottom:10px">
+            <div class="auto-row report-filter-row" style="margin-bottom:10px">
               <input type="text" class="form-control" id="reportCampaignSearch" list="reportCampaignList" placeholder="Search campaign..." />
               <datalist id="reportCampaignList"></datalist>
               <input type="date" class="form-control" id="reportFromDate" />
               <input type="date" class="form-control" id="reportToDate" />
+              <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies Now</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
-              <button class="btn btn-secondary" id="reportFailureCsvBtn">Download Permanent Failures CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
             <div class="table-wrap" style="margin-top:10px;max-height:260px">
@@ -1048,36 +1057,20 @@
                     <th>Date</th>
                     <th>Sender Email</th>
                     <th>Sent</th>
+                    <th>Replies</th>
+                    <th>No Reply</th>
+                    <th>Reply %</th>
                   </tr>
                 </thead>
                 <tbody id="reportBody">
                   <tr>
-                    <td colspan="4" class="mini">No data</td>
+                    <td colspan="7" class="mini">No data</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <div class="mini" id="replySummary" style="margin-top:10px">Reply analytics: not loaded</div>
-            <div class="table-wrap" style="margin-top:10px;max-height:220px">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Campaign</th>
-                    <th>Sender Email</th>
-                    <th>Sent</th>
-                    <th>Replies</th>
-                    <th>No Reply</th>
-                    <th>Reply %</th>
-                  </tr>
-                </thead>
-                <tbody id="replySenderBody">
-                  <tr>
-                    <td colspan="6" class="mini">No data</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </div>
@@ -1112,8 +1105,6 @@
       autoCampaignId: null,
       stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 },
       reportRows: [],
-      replyCampaignRows: [],
-      replySenderRows: [],
       reportLoadTimer: null,
       campaignMetaByName: {},
       isAutoSettingReportDates: false
@@ -1199,25 +1190,6 @@
         return result;
       }
 
-      async getPermanentFailuresCsv(params = {}) {
-        const query = new URLSearchParams();
-        if (params.campaignQuery) query.set('campaignQuery', params.campaignQuery);
-        if (params.fromDate) query.set('fromDate', params.fromDate);
-        if (params.toDate) query.set('toDate', params.toDate);
-        const response = await fetch(`${this.baseURL}/api/report-permanent-failures-csv?${query.toString()}`);
-        if (!response.ok) {
-          let msg = 'Failed to download permanent failures CSV';
-          try {
-            const err = await response.json();
-            msg = err.error || msg;
-          } catch (_) {
-            // no-op
-          }
-          throw new Error(msg);
-        }
-        return response.blob();
-      }
-
       async getCampaignReplies(params = {}, refresh = false) {
         const query = new URLSearchParams();
         if (params.campaignQuery) query.set('campaignQuery', params.campaignQuery);
@@ -1283,14 +1255,14 @@
           handler: cleanupRedisData
         },
         {
+          id: "reportScanRepliesBtn",
+          event: "click",
+          handler: scanRepliesNow
+        },
+        {
           id: "reportCsvBtn",
           event: "click",
           handler: downloadCampaignReportCsv
-        },
-        {
-          id: "reportFailureCsvBtn",
-          event: "click",
-          handler: downloadPermanentFailuresCsv
         },
       ];
 
@@ -1861,6 +1833,7 @@
       const toDate = document.getElementById('reportToDate')?.value || '';
       const summaryEl = document.getElementById('reportSummary');
       const bodyEl = document.getElementById('reportBody');
+      const replySummaryEl = document.getElementById('replySummary');
 
       try {
         if (summaryEl) summaryEl.textContent = 'Loading...';
@@ -1870,114 +1843,72 @@
         ]);
 
         const rows = Array.isArray(result.rows) ? result.rows : [];
-        state.reportRows = rows;
+        const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
+        const replyByKey = {};
+        for (const ev of repliedEvents) {
+          const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
+          const senderEmail = String(ev.senderEmail || '').trim().toLowerCase();
+          const date = dayKey(Number(ev.sentTs || 0));
+          if (!campaignName || !senderEmail || !date) continue;
+          const key = `${campaignName}|${date}|${senderEmail}`;
+          replyByKey[key] = (replyByKey[key] || 0) + 1;
+        }
 
-        renderReplyAnalytics(replyResult);
+        const mergedRows = rows.map((r) => {
+          const campaignName = String(r.campaignName || r.campaignKey || '').trim();
+          const senderEmail = String(r.senderEmail || '').trim().toLowerCase();
+          const date = String(r.date || '').trim();
+          const sent = Number(r.sent || 0);
+          const replies = Number(replyByKey[`${campaignName}|${date}|${senderEmail}`] || 0);
+          const noReply = Math.max(0, sent - replies);
+          const replyPercent = sent > 0 ? Math.round((replies / sent) * 100) : 0;
+          return { ...r, replies, noReply, replyPercent };
+        });
+        state.reportRows = mergedRows;
 
         if (!bodyEl) return;
-        if (!rows.length) {
-          bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
+        if (!mergedRows.length) {
+          bodyEl.innerHTML = `<tr><td colspan="7" class="mini">No data</td></tr>`;
           if (summaryEl) summaryEl.textContent = 'No report rows found for selected filters';
+          if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: no data';
           return;
         }
 
-        bodyEl.innerHTML = rows.map(r => `
+        bodyEl.innerHTML = mergedRows.map(r => `
           <tr>
             <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
             <td>${escapeHtml(r.date || '')}</td>
             <td>${escapeHtml(r.senderEmail || '')}</td>
             <td><strong>${Number(r.sent || 0)}</strong></td>
+            <td>${Number(r.replies || 0)}</td>
+            <td>${Number(r.noReply || 0)}</td>
+            <td>${Number(r.replyPercent || 0)}%</td>
           </tr>
         `).join('');
 
         const totals = result.totals || {};
         if (summaryEl) {
-          summaryEl.textContent = `Rows: ${Number(totals.totalRows || rows.length)} | Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
+          summaryEl.textContent = `Rows: ${Number(totals.totalRows || mergedRows.length)} | Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
+        }
+
+        const totalSent = mergedRows.reduce((n, r) => n + Number(r.sent || 0), 0);
+        const totalReplies = mergedRows.reduce((n, r) => n + Number(r.replies || 0), 0);
+        const totalNoReply = Math.max(0, totalSent - totalReplies);
+        const totalReplyPct = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
+        let lastScanText = "never";
+        const lastScannedAt = Number(replyResult?.lastScannedAt || 0);
+        if (lastScannedAt) {
+          const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
+          lastScanText = `${new Date(lastScannedAt).toLocaleString()} (${daysAgo} day(s) ago)`;
+        }
+        if (replySummaryEl) {
+          replySummaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${totalNoReply} | Reply %: ${totalReplyPct}%`;
         }
       } catch (e) {
-        if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">Failed to load report</td></tr>`;
+        if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="7" class="mini">Failed to load report</td></tr>`;
         if (summaryEl) summaryEl.textContent = `Error: ${e.message}`;
-        renderReplyAnalytics({ repliedEvents: [], lastScannedAt: null });
+        if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: error';
         log(`Report load failed: ${e.message}`, 'error');
-      }
-    }
-
-    function renderReplyAnalytics(replyResult) {
-      const summaryEl = document.getElementById('replySummary');
-      const senderBody = document.getElementById('replySenderBody');
-
-      const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
-      const lastScannedAt = Number(replyResult?.lastScannedAt || 0);
-      const fromDate = document.getElementById('reportFromDate')?.value || '';
-      const toDate = document.getElementById('reportToDate')?.value || '';
-
-      const sentBySender = {};
-      for (const row of state.reportRows || []) {
-        const campaignName = String(row.campaignName || row.campaignKey || '').trim();
-        const senderEmail = String(row.senderEmail || '').trim().toLowerCase();
-        const sent = Number(row.sent || 0);
-        if (!campaignName || !senderEmail || sent <= 0) continue;
-
-        const senderKey = `${campaignName}|${senderEmail}`;
-        sentBySender[senderKey] = (sentBySender[senderKey] || 0) + sent;
-      }
-
-      const repliesBySender = {};
-      for (const ev of repliedEvents) {
-        const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
-        const senderEmail = String(ev.senderEmail || '').trim().toLowerCase();
-        const d = dayKey(Number(ev.sentTs || 0));
-        if (fromDate && d < fromDate) continue;
-        if (toDate && d > toDate) continue;
-        if (!campaignName || !senderEmail) continue;
-
-        const senderKey = `${campaignName}|${senderEmail}`;
-        repliesBySender[senderKey] = (repliesBySender[senderKey] || 0) + 1;
-      }
-
-      const senders = Object.keys(sentBySender).map((key) => {
-        const splitAt = key.indexOf("|");
-        const campaignName = key.slice(0, splitAt);
-        const senderEmail = key.slice(splitAt + 1);
-        const sent = Number(sentBySender[key] || 0);
-        const replies = Number(repliesBySender[key] || 0);
-        const noReply = Math.max(0, sent - replies);
-        const replyPercent = sent > 0 ? Math.round((replies / sent) * 100) : 0;
-        return { campaignName, senderEmail, sent, replies, noReply, replyPercent };
-      }).sort((a, b) => b.sent - a.sent);
-
-      state.replyCampaignRows = [];
-      state.replySenderRows = senders;
-
-      const totalSent = senders.reduce((n, r) => n + Number(r.sent || 0), 0);
-      const totalReplies = senders.reduce((n, r) => n + Number(r.replies || 0), 0);
-      const noReply = Math.max(0, totalSent - totalReplies);
-      const replyPercent = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
-
-      let lastScanText = "never";
-      if (lastScannedAt) {
-        const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
-        lastScanText = `${new Date(lastScannedAt).toLocaleString()} (${daysAgo} day(s) ago)`;
-      }
-      if (summaryEl) {
-        summaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${noReply} | Reply %: ${replyPercent}%`;
-      }
-
-      if (senderBody) {
-        if (!senders.length) {
-          senderBody.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
-        } else {
-          senderBody.innerHTML = senders.map((r) => `
-            <tr>
-              <td>${escapeHtml(r.campaignName || '')}</td>
-              <td>${escapeHtml(r.senderEmail || '')}</td>
-              <td><strong>${Number(r.sent || 0)}</strong></td>
-              <td>${Number(r.replies || 0)}</td>
-              <td>${Number(r.noReply || 0)}</td>
-              <td>${Number(r.replyPercent || 0)}%</td>
-            </tr>
-          `).join('');
-        }
       }
     }
 
@@ -2009,20 +1940,44 @@
       }
     }
 
+    async function scanRepliesNow() {
+      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
+      const fromDate = document.getElementById('reportFromDate')?.value || '';
+      const toDate = document.getElementById('reportToDate')?.value || '';
+      const btn = document.getElementById('reportScanRepliesBtn');
+      const replySummaryEl = document.getElementById('replySummary');
+
+      try {
+        if (btn) btn.disabled = true;
+        if (replySummaryEl) replySummaryEl.textContent = 'Scanning replies...';
+        await emailAPI.getCampaignReplies({ campaignQuery: search, fromDate, toDate }, true);
+        await loadCampaignReport();
+        log('Reply scan completed', 'success');
+      } catch (e) {
+        if (replySummaryEl) replySummaryEl.textContent = `Reply scan failed: ${e.message}`;
+        log(`Reply scan failed: ${e.message}`, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
     function downloadCampaignReportCsv() {
       if (!Array.isArray(state.reportRows) || state.reportRows.length === 0) {
         log('No report data to download', 'warning');
         return;
       }
 
-      const headers = ['Campaign', 'Date', 'Sender Email', 'Sent'];
+      const headers = ['Campaign', 'Date', 'Sender Email', 'Sent', 'Replies', 'No Reply', 'Reply %'];
       const lines = [headers.join(',')];
       for (const row of state.reportRows) {
         const values = [
           row.campaignName || row.campaignKey || '',
           row.date || '',
           row.senderEmail || '',
-          String(Number(row.sent || 0))
+          String(Number(row.sent || 0)),
+          String(Number(row.replies || 0)),
+          String(Number(row.noReply || 0)),
+          `${Number(row.replyPercent || 0)}%`
         ];
         lines.push(values.map(csvEscape).join(','));
       }
@@ -2036,40 +1991,6 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    }
-
-    async function downloadPermanentFailuresCsv() {
-      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
-      const fromDate = document.getElementById('reportFromDate')?.value || '';
-      const toDate = document.getElementById('reportToDate')?.value || '';
-
-      try {
-        const [blob, replyResult] = await Promise.all([
-          emailAPI.getPermanentFailuresCsv({
-            campaignQuery: search,
-            fromDate,
-            toDate
-          }),
-          emailAPI.getCampaignReplies({
-            campaignQuery: search,
-            fromDate,
-            toDate
-          }, true)
-        ]);
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `permanent-failures-${toDateInputValue(new Date())}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        renderReplyAnalytics(replyResult);
-        log('Permanent failures CSV downloaded', 'success');
-      } catch (e) {
-        log(`Permanent failures CSV failed: ${e.message}`, 'error');
-      }
     }
 
     function updateStatsFromLocalCsvOnly() {
