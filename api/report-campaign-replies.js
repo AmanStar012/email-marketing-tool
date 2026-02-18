@@ -34,11 +34,9 @@ function isLikelySystemMail(subject, fromAddr) {
   return false;
 }
 
-function dayKey(ts) {
-  return new Date(ts).toISOString().slice(0, 10);
-}
-
 const REPLY_SNAPSHOT_KEY = "report:replies:snapshot:v1";
+const REPLY_PROCESSED_KEY = "report:replies:processed:v1";
+const REPLY_PROCESSED_MAX = 50000;
 
 async function listSentEvents(redisClient) {
   const sent = [];
@@ -99,8 +97,9 @@ async function listSentEvents(redisClient) {
   return sent;
 }
 
-async function scanReplies(accounts, sinceDate) {
+async function scanReplies(accounts, sinceDate, processedSet) {
   const allReplies = [];
+  const newProcessedIds = [];
   const maxPerAccount = Number(process.env.REPLY_SCAN_MAX_MESSAGES || 500);
 
   for (const account of accounts) {
@@ -118,14 +117,17 @@ async function scanReplies(accounts, sinceDate) {
     await client.connect();
     try {
       await client.mailboxOpen("INBOX", { readOnly: true });
-      let uids = await client.search({ since: sinceDate });
+      let uids = await client.search({ seen: false, since: sinceDate });
       if (!Array.isArray(uids) || uids.length === 0) continue;
       if (uids.length > maxPerAccount) {
         uids = uids.slice(uids.length - maxPerAccount);
       }
 
-      for await (const msg of client.fetch(uids, { envelope: true, internalDate: true })) {
+      for await (const msg of client.fetch(uids, { uid: true, envelope: true, internalDate: true })) {
         const env = msg.envelope || {};
+        const msgId = `${String(account.email || "").trim().toLowerCase()}|${String(msg.uid || "")}`;
+        if (processedSet.has(msgId)) continue;
+
         const fromAddr = String(env.from?.[0]?.address || "").trim().toLowerCase();
         const subjectNorm = normalizeSubject(env.subject || "");
         if (!fromAddr || !subjectNorm) continue;
@@ -138,13 +140,14 @@ async function scanReplies(accounts, sinceDate) {
           subjectNorm,
           ts
         });
+        newProcessedIds.push(msgId);
       }
     } finally {
       await client.logout();
     }
   }
 
-  return allReplies;
+  return { allReplies, newProcessedIds };
 }
 
 module.exports = async function handler(req, res) {
@@ -157,9 +160,6 @@ module.exports = async function handler(req, res) {
   let redisClient = null;
   try {
     const refresh = String(req.query?.refresh || "") === "1";
-    const campaignQuery = String(req.query?.campaignQuery || "").trim().toLowerCase();
-    const fromDate = String(req.query?.fromDate || "");
-    const toDate = String(req.query?.toDate || "");
 
     if (refresh) {
       const redisUrl = process.env.REDIS_URL;
@@ -168,6 +168,8 @@ module.exports = async function handler(req, res) {
       await redisClient.connect();
 
       const sentAll = await listSentEvents(redisClient);
+      const processedList = (await redisGet(REPLY_PROCESSED_KEY)) || [];
+      const processedSet = new Set(Array.isArray(processedList) ? processedList : []);
       const runtime = (await redisGet("accounts:runtime")) || {};
       const accounts = loadAccountsConfig()
         .filter((a) => runtime[String(a.id)]?.connected !== false)
@@ -176,7 +178,7 @@ module.exports = async function handler(req, res) {
       const earliestTs = sentAll.length
         ? Math.min(...sentAll.map((s) => s.ts))
         : Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const replies = await scanReplies(accounts, new Date(earliestTs));
+      const { allReplies: replies, newProcessedIds } = await scanReplies(accounts, new Date(earliestTs), processedSet);
 
       const sentByKey = {};
       for (const s of sentAll) {
@@ -214,25 +216,21 @@ module.exports = async function handler(req, res) {
         lastScannedAt: Date.now(),
         repliedEvents
       });
+
+      // Keep processed unread message ids so re-scan does not double count.
+      for (const id of newProcessedIds) processedSet.add(id);
+      const processedTrimmed = Array.from(processedSet);
+      if (processedTrimmed.length > REPLY_PROCESSED_MAX) {
+        processedTrimmed.splice(0, processedTrimmed.length - REPLY_PROCESSED_MAX);
+      }
+      await redisSet(REPLY_PROCESSED_KEY, processedTrimmed);
     }
 
     const snapshot = (await redisGet(REPLY_SNAPSHOT_KEY)) || { lastScannedAt: null, repliedEvents: [] };
-    const all = Array.isArray(snapshot.repliedEvents) ? snapshot.repliedEvents : [];
-    const repliedEvents = all.filter((r) => {
-      const d = dayKey(Number(r.sentTs || 0));
-      if (fromDate && d < fromDate) return false;
-      if (toDate && d > toDate) return false;
-      if (campaignQuery) {
-        const hay = `${r.campaignName || ""} ${r.campaignId || ""}`.toLowerCase();
-        if (!hay.includes(campaignQuery)) return false;
-      }
-      return true;
-    });
-
     return res.status(200).json({
       success: true,
       lastScannedAt: snapshot.lastScannedAt || null,
-      repliedEvents
+      repliedEvents: Array.isArray(snapshot.repliedEvents) ? snapshot.repliedEvents : []
     });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });

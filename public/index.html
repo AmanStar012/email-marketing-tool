@@ -1047,7 +1047,7 @@
               <input type="date" class="form-control" id="reportToDate" />
             </div>
             <div class="auto-row report-filter-row" style="margin-bottom:10px">
-              <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies Now</button>
+              <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
@@ -1059,20 +1059,36 @@
                     <th>Date</th>
                     <th>Sender</th>
                     <th>Sent</th>
-                    <th>Replies</th>
-                    <th>No Reply</th>
-                    <th>Reply %</th>
                   </tr>
                 </thead>
                 <tbody id="reportBody">
                   <tr>
-                    <td colspan="7" class="mini">No data</td>
+                    <td colspan="4" class="mini">No data</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <div class="mini" id="replySummary" style="margin-top:10px">Reply analytics: not loaded</div>
+            <div class="table-wrap" style="margin-top:10px;max-height:220px">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Campaign</th>
+                    <th>Sender</th>
+                    <th>Sent</th>
+                    <th>Replies</th>
+                    <th>No Reply</th>
+                    <th>Reply %</th>
+                  </tr>
+                </thead>
+                <tbody id="replySenderBody">
+                  <tr>
+                    <td colspan="6" class="mini">No data</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1826,9 +1842,11 @@
       const summaryEl = document.getElementById('reportSummary');
       const bodyEl = document.getElementById('reportBody');
       const replySummaryEl = document.getElementById('replySummary');
+      const replyBodyEl = document.getElementById('replySenderBody');
       if (summaryEl) summaryEl.textContent = 'No report loaded';
-      if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="7" class="mini">No data</td></tr>`;
+      if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
       if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: not loaded';
+      if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
       state.reportRows = [];
     }
 
@@ -1839,6 +1857,7 @@
       const summaryEl = document.getElementById('reportSummary');
       const bodyEl = document.getElementById('reportBody');
       const replySummaryEl = document.getElementById('replySummary');
+      const replyBodyEl = document.getElementById('replySenderBody');
 
       try {
         if (summaryEl) summaryEl.textContent = 'Loading...';
@@ -1849,72 +1868,108 @@
 
         const rows = Array.isArray(result.rows) ? result.rows : [];
         const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
-        const replyByKey = {};
-        for (const ev of repliedEvents) {
-          const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
-          const senderEmail = String(ev.senderEmail || '').trim().toLowerCase();
-          const date = dayKey(Number(ev.sentTs || 0));
-          if (!campaignName || !senderEmail || !date) continue;
-          const key = `${campaignName}|${date}|${senderEmail}`;
-          replyByKey[key] = (replyByKey[key] || 0) + 1;
-        }
-
-        const mergedRows = rows.map((r) => {
-          const campaignName = String(r.campaignName || r.campaignKey || '').trim();
-          const senderEmail = String(r.senderEmail || '').trim().toLowerCase();
-          const date = String(r.date || '').trim();
-          const sent = Number(r.sent || 0);
-          const replies = Number(replyByKey[`${campaignName}|${date}|${senderEmail}`] || 0);
-          const noReply = Math.max(0, sent - replies);
-          const replyPercent = sent > 0 ? Math.round((replies / sent) * 100) : 0;
-          return { ...r, replies, noReply, replyPercent };
-        });
-        state.reportRows = mergedRows;
+        state.reportRows = rows;
 
         if (!bodyEl) return;
-        if (!mergedRows.length) {
-          bodyEl.innerHTML = `<tr><td colspan="7" class="mini">No data</td></tr>`;
+        if (!rows.length) {
+          bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
           if (summaryEl) summaryEl.textContent = 'No report rows found for selected filters';
           if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: no data';
+          if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
           return;
         }
 
-        bodyEl.innerHTML = mergedRows.map(r => `
+        bodyEl.innerHTML = rows.map(r => `
           <tr>
             <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
             <td>${escapeHtml(formatDateNoYear(r.date || ''))}</td>
             <td>${escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
             <td><strong>${Number(r.sent || 0)}</strong></td>
-            <td>${Number(r.replies || 0)}</td>
-            <td>${Number(r.noReply || 0)}</td>
-            <td>${Number(r.replyPercent || 0)}%</td>
           </tr>
         `).join('');
 
         const totals = result.totals || {};
         if (summaryEl) {
-          summaryEl.textContent = `Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
+          summaryEl.textContent = `Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || rows.length)}`;
         }
-
-        const totalSent = mergedRows.reduce((n, r) => n + Number(r.sent || 0), 0);
-        const totalReplies = mergedRows.reduce((n, r) => n + Number(r.replies || 0), 0);
-        const totalNoReply = Math.max(0, totalSent - totalReplies);
-        const totalReplyPct = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
-        let lastScanText = "never";
-        const lastScannedAt = Number(replyResult?.lastScannedAt || 0);
-        if (lastScannedAt) {
-          const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
-          lastScanText = `${formatDateTimeNoYear(lastScannedAt)} (${daysAgo} day(s) ago)`;
-        }
-        if (replySummaryEl) {
-          replySummaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${totalNoReply} | Reply %: ${totalReplyPct}%`;
-        }
+        renderReplyBreakdown(rows, repliedEvents, replyResult?.lastScannedAt, replySummaryEl, replyBodyEl);
       } catch (e) {
-        if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="7" class="mini">Failed to load report</td></tr>`;
+        if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">Failed to load report</td></tr>`;
         if (summaryEl) summaryEl.textContent = `Error: ${e.message}`;
         if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: error';
+        if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
         log(`Report load failed: ${e.message}`, 'error');
       }
+    }
+
+    function renderReplyBreakdown(rows, repliedEvents, lastScannedAtRaw, replySummaryEl, replyBodyEl) {
+      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim().toLowerCase();
+
+      const sentBySender = {};
+      for (const row of rows || []) {
+        const campaignName = String(row.campaignName || row.campaignKey || '').trim();
+        const senderEmail = String(row.senderEmail || '').trim().toLowerCase();
+        const sent = Number(row.sent || 0);
+        if (!campaignName || !senderEmail || sent <= 0) continue;
+        const key = `${campaignName}|${senderEmail}`;
+        sentBySender[key] = (sentBySender[key] || 0) + sent;
+      }
+
+      const uniqueReplyRecipientsBySender = {};
+      for (const ev of repliedEvents || []) {
+        const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
+        const senderEmail = String(ev.senderEmail || '').trim().toLowerCase();
+        const recipientEmail = String(ev.recipientEmail || '').trim().toLowerCase();
+        if (!campaignName || !senderEmail) continue;
+        if (search && !campaignName.toLowerCase().includes(search)) continue;
+        const key = `${campaignName}|${senderEmail}`;
+        uniqueReplyRecipientsBySender[key] ||= new Set();
+        if (recipientEmail) uniqueReplyRecipientsBySender[key].add(recipientEmail);
+      }
+
+      const senderRows = Object.keys(sentBySender).map((key) => {
+        const splitAt = key.indexOf("|");
+        const campaignName = key.slice(0, splitAt);
+        const senderEmail = key.slice(splitAt + 1);
+        const sent = Number(sentBySender[key] || 0);
+        const replies = Number(uniqueReplyRecipientsBySender[key]?.size || 0);
+        const noReply = Math.max(0, sent - replies);
+        const replyPercent = sent > 0 ? Math.round((replies / sent) * 100) : 0;
+        return { campaignName, senderEmail, sent, replies, noReply, replyPercent };
+      }).sort((a, b) => b.sent - a.sent);
+
+      const totalSent = senderRows.reduce((n, r) => n + Number(r.sent || 0), 0);
+      const totalReplies = senderRows.reduce((n, r) => n + Number(r.replies || 0), 0);
+      const totalNoReply = Math.max(0, totalSent - totalReplies);
+      const totalReplyPct = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
+
+      let lastScanText = "never";
+      const lastScannedAt = Number(lastScannedAtRaw || 0);
+      if (lastScannedAt) {
+        const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
+        lastScanText = `${formatDateTimeNoYear(lastScannedAt)} (${daysAgo} day(s) ago)`;
+      }
+
+      if (replySummaryEl) {
+        replySummaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${totalNoReply} | Reply %: ${totalReplyPct}%`;
+      }
+
+      if (!replyBodyEl) return;
+      if (!senderRows.length) {
+        replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
+        return;
+      }
+
+      replyBodyEl.innerHTML = senderRows.map((r) => `
+        <tr>
+          <td>${escapeHtml(r.campaignName || '')}</td>
+          <td>${escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
+          <td><strong>${Number(r.sent || 0)}</strong></td>
+          <td>${Number(r.replies || 0)}</td>
+          <td>${Number(r.noReply || 0)}</td>
+          <td>${Number(r.replyPercent || 0)}%</td>
+        </tr>
+      `).join('');
     }
 
     async function ensureCampaignNameOptions() {
@@ -1946,16 +2001,13 @@
     }
 
     async function scanRepliesNow() {
-      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim();
-      const fromDate = document.getElementById('reportFromDate')?.value || '';
-      const toDate = document.getElementById('reportToDate')?.value || '';
       const btn = document.getElementById('reportScanRepliesBtn');
       const replySummaryEl = document.getElementById('replySummary');
 
       try {
         if (btn) btn.disabled = true;
         if (replySummaryEl) replySummaryEl.textContent = 'Scanning replies...';
-        await emailAPI.getCampaignReplies({ campaignQuery: search, fromDate, toDate }, true);
+        await emailAPI.getCampaignReplies({}, true);
         await loadCampaignReport();
         log('Reply scan completed', 'success');
       } catch (e) {
@@ -1972,17 +2024,14 @@
         return;
       }
 
-      const headers = ['Campaign', 'Date', 'Sender Name', 'Sent', 'Replies', 'No Reply', 'Reply %'];
+      const headers = ['Campaign', 'Date', 'Sender Name', 'Sent'];
       const lines = [headers.join(',')];
       for (const row of state.reportRows) {
         const values = [
           row.campaignName || row.campaignKey || '',
           row.date || '',
           getSenderNameByEmail(row.senderEmail || ''),
-          String(Number(row.sent || 0)),
-          String(Number(row.replies || 0)),
-          String(Number(row.noReply || 0)),
-          `${Number(row.replyPercent || 0)}%`
+          String(Number(row.sent || 0))
         ];
         lines.push(values.map(csvEscape).join(','));
       }
