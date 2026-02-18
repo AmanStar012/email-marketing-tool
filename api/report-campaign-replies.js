@@ -1,6 +1,6 @@
 const { createClient } = require("redis");
 const { ImapFlow } = require("imapflow");
-const { cors, loadAccountsConfig, redisGet, redisSet } = require("./_shared");
+const { cors, loadAccountsConfig, redisGet, redisSet, redisSetNx, redisDel } = require("./_shared");
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -37,6 +37,8 @@ function isLikelySystemMail(subject, fromAddr) {
 const REPLY_SNAPSHOT_KEY = "report:replies:snapshot:v1";
 const REPLY_PROCESSED_KEY = "report:replies:processed:v1";
 const REPLY_PROCESSED_MAX = 50000;
+const REPLY_SCAN_LOCK_KEY = "report:replies:scan:lock";
+const REPLY_SCAN_LOCK_TTL_MS = 15 * 60 * 1000;
 
 async function listSentEvents(redisClient) {
   const sent = [];
@@ -158,10 +160,23 @@ module.exports = async function handler(req, res) {
   }
 
   let redisClient = null;
+  let scanLockAcquired = false;
   try {
     const refresh = String(req.query?.refresh || "") === "1";
 
     if (refresh) {
+      scanLockAcquired = await redisSetNx(
+        REPLY_SCAN_LOCK_KEY,
+        { ts: Date.now() },
+        REPLY_SCAN_LOCK_TTL_MS
+      );
+      if (!scanLockAcquired) {
+        return res.status(429).json({
+          success: false,
+          error: "Reply scan already in progress. Please wait and try again."
+        });
+      }
+
       const redisUrl = process.env.REDIS_URL;
       if (!redisUrl) throw new Error("Missing REDIS_URL env var");
       redisClient = createClient({ url: redisUrl });
@@ -235,6 +250,13 @@ module.exports = async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   } finally {
+    if (scanLockAcquired) {
+      try {
+        await redisDel(REPLY_SCAN_LOCK_KEY);
+      } catch (_) {
+        // no-op
+      }
+    }
     if (redisClient) {
       try {
         await redisClient.quit();

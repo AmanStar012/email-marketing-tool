@@ -599,6 +599,38 @@
       border-radius: 10px
     }
 
+    .report-main-wrap {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .report-main-table th,
+    .report-main-table td {
+      white-space: normal;
+    }
+
+    .report-main-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .report-reply-wrap {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .report-reply-table th,
+    .report-reply-table td {
+      white-space: normal;
+    }
+
+    .report-reply-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -1045,14 +1077,16 @@
               <datalist id="reportCampaignList"></datalist>
               <input type="date" class="form-control" id="reportFromDate" />
               <input type="date" class="form-control" id="reportToDate" />
+              <button class="btn btn-secondary" id="reportApplyBtn">Search</button>
+              <button class="btn btn-secondary" id="reportClearBtn">Clear Filters</button>
             </div>
             <div class="auto-row report-filter-row" style="margin-bottom:10px">
               <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
-            <div class="table-wrap" style="margin-top:10px;max-height:260px">
-              <table>
+            <div class="table-wrap report-main-wrap" style="margin-top:10px;max-height:260px">
+              <table class="report-main-table">
                 <thead>
                   <tr>
                     <th>Campaign</th>
@@ -1070,8 +1104,8 @@
             </div>
 
             <div class="mini" id="replySummary" style="margin-top:10px">Reply analytics: not loaded</div>
-            <div class="table-wrap" style="margin-top:10px;max-height:220px">
-              <table>
+            <div class="table-wrap report-reply-wrap" style="margin-top:10px;max-height:220px">
+              <table class="report-reply-table">
                 <thead>
                   <tr>
                     <th>Campaign</th>
@@ -1271,6 +1305,16 @@
           handler: cleanupRedisData
         },
         {
+          id: "reportApplyBtn",
+          event: "click",
+          handler: applyReportFilters
+        },
+        {
+          id: "reportClearBtn",
+          event: "click",
+          handler: clearReportFilters
+        },
+        {
           id: "reportScanRepliesBtn",
           event: "click",
           handler: scanRepliesNow
@@ -1305,7 +1349,7 @@
           el.addEventListener('focus', () => ensureCampaignNameOptions());
           el.addEventListener('change', () => onCampaignSearchChanged());
           el.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') onCampaignSearchChanged();
+            if (e.key === 'Enter') applyReportFilters();
           });
         } else {
           el.addEventListener('change', () => onReportDateChanged());
@@ -1831,11 +1875,27 @@
         toEl.value = meta.endDate || '';
         state.isAutoSettingReportDates = false;
       }
-      if (!campaignValue) {
+    }
+
+    async function applyReportFilters() {
+      const campaignValue = (document.getElementById('reportCampaignSearch')?.value || '').trim();
+      const fromDate = (document.getElementById('reportFromDate')?.value || '').trim();
+      const toDate = (document.getElementById('reportToDate')?.value || '').trim();
+      if (!campaignValue && !fromDate && !toDate) {
         clearReportView();
         return;
       }
       await loadCampaignReport();
+    }
+
+    function clearReportFilters() {
+      const campaignEl = document.getElementById('reportCampaignSearch');
+      const fromEl = document.getElementById('reportFromDate');
+      const toEl = document.getElementById('reportToDate');
+      if (campaignEl) campaignEl.value = '';
+      if (fromEl) fromEl.value = '';
+      if (toEl) toEl.value = '';
+      clearReportView();
     }
 
     function clearReportView() {
@@ -1867,11 +1927,28 @@
         ]);
 
         const rows = Array.isArray(result.rows) ? result.rows : [];
+        const isSummaryMode = !search;
+        let displayRows = rows;
+        if (isSummaryMode) {
+          const byCampaignDate = {};
+          for (const r of rows) {
+            const campaign = String(r.campaignName || r.campaignKey || '').trim();
+            const date = String(r.date || '').trim();
+            if (!campaign || !date) continue;
+            const k = `${campaign}|${date}`;
+            byCampaignDate[k] ||= { campaignName: campaign, date, senderEmail: '', sent: 0 };
+            byCampaignDate[k].sent += Number(r.sent || 0);
+          }
+          displayRows = Object.values(byCampaignDate).sort((a, b) => {
+            if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+            return a.campaignName.localeCompare(b.campaignName);
+          });
+        }
         const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
-        state.reportRows = rows;
+        state.reportRows = displayRows;
 
         if (!bodyEl) return;
-        if (!rows.length) {
+        if (!displayRows.length) {
           bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
           if (summaryEl) summaryEl.textContent = 'No report rows found for selected filters';
           if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: no data';
@@ -1879,18 +1956,22 @@
           return;
         }
 
-        bodyEl.innerHTML = rows.map(r => `
+        bodyEl.innerHTML = displayRows.map(r => `
           <tr>
             <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
             <td>${escapeHtml(formatDateNoYear(r.date || ''))}</td>
-            <td>${escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
+            <td>${isSummaryMode ? 'All' : escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
             <td><strong>${Number(r.sent || 0)}</strong></td>
           </tr>
         `).join('');
 
         const totals = result.totals || {};
+        const campaignCount = isSummaryMode
+          ? new Set(displayRows.map((r) => String(r.campaignName || r.campaignKey || ''))).size
+          : Number(totals.totalCampaigns || 0);
+        const totalSent = displayRows.reduce((n, r) => n + Number(r.sent || 0), 0);
         if (summaryEl) {
-          summaryEl.textContent = `Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || rows.length)}`;
+          summaryEl.textContent = `Campaigns: ${campaignCount} | Sent: ${totalSent}`;
         }
         renderReplyBreakdown(rows, repliedEvents, replyResult?.lastScannedAt, replySummaryEl, replyBodyEl);
       } catch (e) {
