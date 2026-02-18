@@ -1057,7 +1057,7 @@
                   <tr>
                     <th>Campaign</th>
                     <th>Date</th>
-                    <th>Sender Email</th>
+                    <th>Sender</th>
                     <th>Sent</th>
                     <th>Replies</th>
                     <th>No Reply</th>
@@ -1107,7 +1107,6 @@
       autoCampaignId: null,
       stats: { totalSent: 0, successRate: 0, inQueue: 0, failed: 0 },
       reportRows: [],
-      reportLoadTimer: null,
       campaignMetaByName: {},
       isAutoSettingReportDates: false
     };
@@ -1221,7 +1220,6 @@
       refreshAutoStatus();
       initializeReportFilters();
       ensureCampaignNameOptions().catch(() => { });
-      loadCampaignReport().catch(() => { });
       log('UI ready. Auto available.', 'info');
 
       setInterval(() => {
@@ -1796,17 +1794,9 @@
       }
     }
 
-    function scheduleReportLoad() {
-      if (state.reportLoadTimer) clearTimeout(state.reportLoadTimer);
-      state.reportLoadTimer = setTimeout(() => {
-        loadCampaignReport();
-      }, 250);
-    }
-
     async function onReportDateChanged() {
       if (state.isAutoSettingReportDates) return;
       await ensureCampaignNameOptions();
-      scheduleReportLoad();
     }
 
     async function onCampaignSearchChanged() {
@@ -1825,8 +1815,21 @@
         toEl.value = meta.endDate || '';
         state.isAutoSettingReportDates = false;
       }
+      if (!campaignValue) {
+        clearReportView();
+        return;
+      }
+      await loadCampaignReport();
+    }
 
-      scheduleReportLoad();
+    function clearReportView() {
+      const summaryEl = document.getElementById('reportSummary');
+      const bodyEl = document.getElementById('reportBody');
+      const replySummaryEl = document.getElementById('replySummary');
+      if (summaryEl) summaryEl.textContent = 'No report loaded';
+      if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="7" class="mini">No data</td></tr>`;
+      if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: not loaded';
+      state.reportRows = [];
     }
 
     async function loadCampaignReport() {
@@ -1880,7 +1883,7 @@
           <tr>
             <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
             <td>${escapeHtml(formatDateNoYear(r.date || ''))}</td>
-            <td>${escapeHtml(r.senderEmail || '')}</td>
+            <td>${escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
             <td><strong>${Number(r.sent || 0)}</strong></td>
             <td>${Number(r.replies || 0)}</td>
             <td>${Number(r.noReply || 0)}</td>
@@ -1890,7 +1893,7 @@
 
         const totals = result.totals || {};
         if (summaryEl) {
-          summaryEl.textContent = `Rows: ${Number(totals.totalRows || mergedRows.length)} | Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
+          summaryEl.textContent = `Campaigns: ${Number(totals.totalCampaigns || 0)} | Sent: ${Number(totals.totalSent || 0)}`;
         }
 
         const totalSent = mergedRows.reduce((n, r) => n + Number(r.sent || 0), 0);
@@ -1969,13 +1972,13 @@
         return;
       }
 
-      const headers = ['Campaign', 'Date', 'Sender Email', 'Sent', 'Replies', 'No Reply', 'Reply %'];
+      const headers = ['Campaign', 'Date', 'Sender Name', 'Sent', 'Replies', 'No Reply', 'Reply %'];
       const lines = [headers.join(',')];
       for (const row of state.reportRows) {
         const values = [
           row.campaignName || row.campaignKey || '',
           row.date || '',
-          row.senderEmail || '',
+          getSenderNameByEmail(row.senderEmail || ''),
           String(Number(row.sent || 0)),
           String(Number(row.replies || 0)),
           String(Number(row.noReply || 0)),
@@ -2162,6 +2165,13 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+
+    function getSenderNameByEmail(email) {
+      const target = String(email || '').trim().toLowerCase();
+      if (!target) return '';
+      const match = (state.emailAccounts || []).find(a => String(a.email || '').trim().toLowerCase() === target);
+      return (match && match.senderName) ? match.senderName : target;
     }
     function injectEditorToolbar() {
       const emailContent = document.getElementById('emailContent');
