@@ -1045,6 +1045,8 @@
               <datalist id="reportCampaignList"></datalist>
               <input type="date" class="form-control" id="reportFromDate" />
               <input type="date" class="form-control" id="reportToDate" />
+            </div>
+            <div class="auto-row report-filter-row" style="margin-bottom:10px">
               <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies Now</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
             </div>
@@ -1679,7 +1681,7 @@
         Name: <strong>${escapeHtml(c.campaignName || '—')}</strong><br>
         Campaign: <strong>${escapeHtml(c.id)}</strong><br>
         Progress: <strong>${cursor}/${total}</strong> (${percent}%)<br>
-        Updated: ${new Date(c.updatedAt).toLocaleString()}
+        Updated: ${formatDateTimeNoYear(c.updatedAt)}
       `;
 
         const progressEl = document.getElementById('progressFill');
@@ -1695,7 +1697,7 @@
           <div><span class="pill pill-green">SENDING NOW</span></div>
           <div style="margin-top:8px"><strong>${escapeHtml(live.currentEmail)}</strong></div>
           <div class="mini">Sender: ${escapeHtml(live.currentSenderName || "")}</div>
-          <div class="mini">Updated: ${new Date(live.updatedAt).toLocaleString()}</div>
+          <div class="mini">Updated: ${formatDateTimeNoYear(live.updatedAt)}</div>
         `;
         } else if (live && live.state === "completed") {
           liveBox.innerHTML = `<span class="pill pill-blue">COMPLETED</span>`;
@@ -1738,7 +1740,7 @@
             <td>${escapeHtml(r.senderName)}</td>
             <td><strong>${r.sent}</strong></td>
             <td>${r.failed}</td>
-            <td>${r.lastSentAt ? new Date(r.lastSentAt).toLocaleString() : '—'}</td>
+            <td>${r.lastSentAt ? formatDateTimeNoYear(r.lastSentAt) : '—'}</td>
           </tr>
         `).join("");
         }
@@ -1751,7 +1753,7 @@
           eventsLog.innerHTML = `<div class="log-entry log-info">No events yet</div>`;
         } else {
           eventsLog.innerHTML = events.map(ev => {
-            const ts = ev.ts ? new Date(ev.ts).toLocaleString() : '';
+            const ts = ev.ts ? formatDateTimeNoYear(ev.ts) : '';
             const accepted = Array.isArray(ev.accepted)
               ? ev.accepted.join(", ")
               : (ev.accepted ? String(ev.accepted) : "");
@@ -1766,10 +1768,10 @@
             ].filter(Boolean);
             const detailText = detailParts.length ? ` | ${detailParts.join(" | ")}` : "";
             if (ev.status === "sent") {
-              return `<div class="log-entry log-success">[${escapeHtml(ts)}] ? SENT | from ${escapeHtml(ev.from || "")} ? ${escapeHtml(ev.to || "")}${escapeHtml(detailText)}</div>`;
+              return `<div class="log-entry log-success">[${escapeHtml(ts)}] SENT | from ${escapeHtml(ev.from || "")} -> ${escapeHtml(ev.to || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "failed") {
-              return `<div class="log-entry log-error">[${escapeHtml(ts)}] ? FAILED | from ${escapeHtml(ev.from || "")} ? ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
+              return `<div class="log-entry log-error">[${escapeHtml(ts)}] FAILED | from ${escapeHtml(ev.from || "")} -> ${escapeHtml(ev.to || "")} | ${escapeHtml(ev.error || "")}${escapeHtml(detailText)}</div>`;
             }
             if (ev.status === "campaign_completed") {
               return `<div class="log-entry log-info">[${escapeHtml(ts)}] CAMPAIGN COMPLETED (${escapeHtml(ev.campaignId || "")})</div>`;
@@ -1877,7 +1879,7 @@
         bodyEl.innerHTML = mergedRows.map(r => `
           <tr>
             <td>${escapeHtml(r.campaignName || r.campaignKey || '')}</td>
-            <td>${escapeHtml(r.date || '')}</td>
+            <td>${escapeHtml(formatDateNoYear(r.date || ''))}</td>
             <td>${escapeHtml(r.senderEmail || '')}</td>
             <td><strong>${Number(r.sent || 0)}</strong></td>
             <td>${Number(r.replies || 0)}</td>
@@ -1899,7 +1901,7 @@
         const lastScannedAt = Number(replyResult?.lastScannedAt || 0);
         if (lastScannedAt) {
           const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
-          lastScanText = `${new Date(lastScannedAt).toLocaleString()} (${daysAgo} day(s) ago)`;
+          lastScanText = `${formatDateTimeNoYear(lastScannedAt)} (${daysAgo} day(s) ago)`;
         }
         if (replySummaryEl) {
           replySummaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${totalNoReply} | Reply %: ${totalReplyPct}%`;
@@ -2108,6 +2110,41 @@
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
+    }
+
+    function formatDateNoYear(value) {
+      if (!value) return '';
+      const s = String(value).trim();
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) return `${m[3]}-${m[2]}`;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return s;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      return `${day}-${month}`;
+    }
+
+    function formatTime12(value) {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    function formatDateTimeNoYear(value) {
+      const datePart = formatDateNoYear(value);
+      const timePart = formatTime12(value);
+      if (!datePart && !timePart) return '';
+      if (!datePart) return timePart;
+      if (!timePart) return datePart;
+      return `${datePart} ${timePart}`;
+    }
+
+    function dayKey(ts) {
+      return new Date(ts).toISOString().slice(0, 10);
     }
 
 
