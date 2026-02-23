@@ -1007,7 +1007,7 @@
 </textarea>
 
           <label class="form-label">Subjects</label>
-          <textarea class="form-control  form-control-textarea" id="subjectLine" rows="4" spellcheck="true"
+          <textarea class="form-control  form-control-textarea" id="subjectLine" rows="4"
             placeholder="Enter one subject per line">
 </textarea>
 
@@ -1018,14 +1018,9 @@
 
           <div class="form-group">
             <label class="form-label">Email Content</label>
-            <textarea class="form-control form-control-textarea" id="emailContent" spellcheck="true"
+            <textarea class="form-control form-control-textarea" id="emailContent"
               placeholder="Hey {{firstName}},&#10;&#10;I’m {{senderName}}, and we’re currently shortlisting creators for a paid collaboration with {{brandName}}.&#10;&#10;..."></textarea>
           </div>
-          <div class="auto-row" style="margin-top:10px">
-            <input class="form-control" id="templateCheckSearch" placeholder="Search variable (example: {{firstName}})" />
-            <button class="btn btn-secondary" id="templateCheckBtn">Check Variables</button>
-          </div>
-          <div class="mini" id="templateCheckResult" style="margin-top:8px">Variable check not run</div>
 
           <div class="auto-box">
             <div class="auto-row">
@@ -1291,11 +1286,6 @@
           event: "click",
           handler: downloadCampaignReportCsv
         },
-        {
-          id: "templateCheckBtn",
-          event: "click",
-          handler: runTemplateCheck
-        },
       ];
 
       // Button / file bindings
@@ -1313,13 +1303,6 @@
         if (!el) return;
         el.addEventListener('input', saveTemplateToLocalStorage);
       });
-
-      const templateCheckSearch = document.getElementById('templateCheckSearch');
-      if (templateCheckSearch) {
-        templateCheckSearch.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') runTemplateCheck();
-        });
-      }
 
       ['reportCampaignSearch', 'reportFromDate', 'reportToDate'].forEach(id => {
         const el = document.getElementById(id);
@@ -2002,93 +1985,6 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    }
-
-    function getTemplateVariableKeys() {
-      const keys = new Set(['brandName', 'senderName', 'campaignName']);
-      const firstContact = state.contacts && state.contacts.length ? state.contacts[0] : null;
-      if (firstContact && typeof firstContact === 'object') {
-        Object.keys(firstContact).forEach((k) => {
-          if (k && typeof k === 'string') keys.add(k);
-        });
-      }
-      return Array.from(keys);
-    }
-
-    function extractTemplateVariables(text) {
-      const vars = [];
-      const re = /{{\s*([^{}]+?)\s*}}/g;
-      let m;
-      while ((m = re.exec(text || '')) !== null) {
-        const raw = String(m[1] || '').trim();
-        if (raw) vars.push(raw);
-      }
-      return vars;
-    }
-
-    function runTemplateCheck() {
-      const subject = document.getElementById('subjectLine')?.value || '';
-      const body = document.getElementById('emailContent')?.value || '';
-      const queryRaw = (document.getElementById('templateCheckSearch')?.value || '').trim();
-      const output = document.getElementById('templateCheckResult');
-      if (!output) return;
-
-      const templateText = `${subject}\n${body}`;
-      const usedVars = Array.from(new Set(extractTemplateVariables(templateText)));
-      const availableVars = getTemplateVariableKeys();
-      const availableExact = new Set(availableVars);
-      const availableLowerMap = new Map(availableVars.map((k) => [k.toLowerCase(), k]));
-
-      const unknown = [];
-      const warnings = [];
-      for (const v of usedVars) {
-        if (availableExact.has(v)) continue;
-        const lower = availableLowerMap.get(v.toLowerCase());
-        if (lower) {
-          warnings.push(`${v} -> use exact: {{${lower}}}`);
-          continue;
-        }
-        unknown.push(v);
-      }
-
-      const validPlaceholderRe = /{{\s*[^{}]+?\s*}}/g;
-      const braceRemainder = templateText.replace(validPlaceholderRe, '');
-      const brokenBraceSnippets = [];
-      if (braceRemainder.includes('{') || braceRemainder.includes('}')) {
-        for (let i = 0; i < braceRemainder.length; i++) {
-          const ch = braceRemainder[i];
-          if (ch !== '{' && ch !== '}') continue;
-          const start = Math.max(0, i - 12);
-          const end = Math.min(braceRemainder.length, i + 18);
-          const snippet = braceRemainder.slice(start, end).replace(/\s+/g, ' ').trim();
-          if (snippet && !brokenBraceSnippets.includes(snippet)) brokenBraceSnippets.push(snippet);
-          if (brokenBraceSnippets.length >= 3) break;
-        }
-      }
-      if (brokenBraceSnippets.length) {
-        warnings.push(`Invalid placeholder syntax detected near: ${brokenBraceSnippets.join(' | ')}`);
-      }
-
-      const openCount = (templateText.match(/{{/g) || []).length;
-      const closeCount = (templateText.match(/}}/g) || []).length;
-      if (openCount !== closeCount) warnings.push(`Bracket mismatch: {{=${openCount}, }}=${closeCount}`);
-
-      const queryName = queryRaw.replace(/[{}]/g, '').trim();
-      let queryInfo = '';
-      if (queryName) {
-        const exactMatches = usedVars.filter(v => v === queryName).length;
-        const ciMatches = usedVars.filter(v => v.toLowerCase() === queryName.toLowerCase()).length;
-        queryInfo = `Search variable {{${queryName}}}: ${exactMatches ? 'found' : (ciMatches ? 'case mismatch' : 'not found')}`;
-      }
-
-      const parts = [];
-      if (queryInfo) parts.push(escapeHtml(queryInfo));
-      parts.push(`Variables used: ${usedVars.length ? usedVars.map((v) => `{{${escapeHtml(v)}}}`).join(', ') : 'none'}`);
-      parts.push(`Unknown variables: ${unknown.length ? unknown.map((v) => `{{${escapeHtml(v)}}}`).join(', ') : 'none'}`);
-      if (warnings.length) parts.push(`Warnings: ${warnings.map(escapeHtml).join(' | ')}`);
-
-      output.innerHTML = parts.join('<br>');
-      log(`Variable check complete. Unknown vars: ${unknown.length}`, (unknown.length || warnings.length) ? 'warning' : 'success');
     }
 
     function updateStatsFromLocalCsvOnly() {
