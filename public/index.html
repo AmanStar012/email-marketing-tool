@@ -1007,7 +1007,7 @@
 </textarea>
 
           <label class="form-label">Subjects</label>
-          <textarea class="form-control  form-control-textarea" id="subjectLine" rows="4"
+          <textarea class="form-control  form-control-textarea" id="subjectLine" rows="4" spellcheck="true"
             placeholder="Enter one subject per line">
 </textarea>
 
@@ -1018,9 +1018,14 @@
 
           <div class="form-group">
             <label class="form-label">Email Content</label>
-            <textarea class="form-control form-control-textarea" id="emailContent"
+            <textarea class="form-control form-control-textarea" id="emailContent" spellcheck="true"
               placeholder="Hey {{firstName}},&#10;&#10;I’m {{senderName}}, and we’re currently shortlisting creators for a paid collaboration with {{brandName}}.&#10;&#10;..."></textarea>
           </div>
+          <div class="auto-row" style="margin-top:10px">
+            <input class="form-control" id="templateCheckSearch" placeholder="Search variable (example: {{firstName}})" />
+            <button class="btn btn-secondary" id="templateCheckBtn">Check Variables</button>
+          </div>
+          <div class="mini" id="templateCheckResult" style="margin-top:8px">Variable check not run</div>
 
           <div class="auto-box">
             <div class="auto-row">
@@ -1081,7 +1086,6 @@
             <div class="auto-row report-filter-row" style="margin-bottom:10px">
               <button class="btn btn-secondary" id="reportApplyBtn">Search</button>
               <button class="btn btn-secondary" id="reportClearBtn">Clear Filters</button>
-              <button class="btn btn-secondary" id="reportScanRepliesBtn">Scan Replies</button>
               <button class="btn btn-secondary" id="reportCsvBtn">Download CSV</button>
             </div>
             <div class="mini" id="reportSummary">No report loaded</div>
@@ -1098,27 +1102,6 @@
                 <tbody id="reportBody">
                   <tr>
                     <td colspan="4" class="mini">No data</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div class="mini" id="replySummary" style="margin-top:10px">Reply analytics: not loaded</div>
-            <div class="table-wrap report-reply-wrap" style="margin-top:10px;max-height:220px">
-              <table class="report-reply-table">
-                <thead>
-                  <tr>
-                    <th>Campaign</th>
-                    <th>Sender</th>
-                    <th>Sent</th>
-                    <th>Replies</th>
-                    <th>No Reply</th>
-                    <th>Reply %</th>
-                  </tr>
-                </thead>
-                <tbody id="replySenderBody">
-                  <tr>
-                    <td colspan="6" class="mini">No data</td>
                   </tr>
                 </tbody>
               </table>
@@ -1241,17 +1224,6 @@
         return result;
       }
 
-      async getCampaignReplies(params = {}, refresh = false) {
-        const query = new URLSearchParams();
-        if (params.campaignQuery) query.set('campaignQuery', params.campaignQuery);
-        if (params.fromDate) query.set('fromDate', params.fromDate);
-        if (params.toDate) query.set('toDate', params.toDate);
-        if (refresh) query.set('refresh', '1');
-        const response = await fetch(`${this.baseURL}/api/report-campaign-replies?${query.toString()}`);
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to fetch campaign replies');
-        return result;
-      }
     }
 
     const emailAPI = new EmailMarketingAPI();
@@ -1315,14 +1287,14 @@
           handler: clearReportFilters
         },
         {
-          id: "reportScanRepliesBtn",
-          event: "click",
-          handler: scanRepliesNow
-        },
-        {
           id: "reportCsvBtn",
           event: "click",
           handler: downloadCampaignReportCsv
+        },
+        {
+          id: "templateCheckBtn",
+          event: "click",
+          handler: runTemplateCheck
         },
       ];
 
@@ -1341,6 +1313,13 @@
         if (!el) return;
         el.addEventListener('input', saveTemplateToLocalStorage);
       });
+
+      const templateCheckSearch = document.getElementById('templateCheckSearch');
+      if (templateCheckSearch) {
+        templateCheckSearch.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') runTemplateCheck();
+        });
+      }
 
       ['reportCampaignSearch', 'reportFromDate', 'reportToDate'].forEach(id => {
         const el = document.getElementById(id);
@@ -1901,12 +1880,8 @@
     function clearReportView() {
       const summaryEl = document.getElementById('reportSummary');
       const bodyEl = document.getElementById('reportBody');
-      const replySummaryEl = document.getElementById('replySummary');
-      const replyBodyEl = document.getElementById('replySenderBody');
       if (summaryEl) summaryEl.textContent = 'No report loaded';
       if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
-      if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: not loaded';
-      if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
       state.reportRows = [];
     }
 
@@ -1916,15 +1891,10 @@
       const toDate = document.getElementById('reportToDate')?.value || '';
       const summaryEl = document.getElementById('reportSummary');
       const bodyEl = document.getElementById('reportBody');
-      const replySummaryEl = document.getElementById('replySummary');
-      const replyBodyEl = document.getElementById('replySenderBody');
 
       try {
         if (summaryEl) summaryEl.textContent = 'Loading...';
-        const [result, replyResult] = await Promise.all([
-          emailAPI.getCampaignReport({ campaignQuery: search, fromDate, toDate }),
-          emailAPI.getCampaignReplies({ campaignQuery: search, fromDate, toDate }, false)
-        ]);
+        const result = await emailAPI.getCampaignReport({ campaignQuery: search, fromDate, toDate });
 
         const rows = Array.isArray(result.rows) ? result.rows : [];
         const isSummaryMode = !search;
@@ -1944,15 +1914,12 @@
             return a.campaignName.localeCompare(b.campaignName);
           });
         }
-        const repliedEvents = Array.isArray(replyResult?.repliedEvents) ? replyResult.repliedEvents : [];
         state.reportRows = displayRows;
 
         if (!bodyEl) return;
         if (!displayRows.length) {
           bodyEl.innerHTML = `<tr><td colspan="4" class="mini">No data</td></tr>`;
           if (summaryEl) summaryEl.textContent = 'No report rows found for selected filters';
-          if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: no data';
-          if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
           return;
         }
 
@@ -1973,84 +1940,11 @@
         if (summaryEl) {
           summaryEl.textContent = `Campaigns: ${campaignCount} | Sent: ${totalSent}`;
         }
-        renderReplyBreakdown(rows, repliedEvents, replyResult?.lastScannedAt, replySummaryEl, replyBodyEl);
       } catch (e) {
         if (bodyEl) bodyEl.innerHTML = `<tr><td colspan="4" class="mini">Failed to load report</td></tr>`;
         if (summaryEl) summaryEl.textContent = `Error: ${e.message}`;
-        if (replySummaryEl) replySummaryEl.textContent = 'Reply analytics: error';
-        if (replyBodyEl) replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
         log(`Report load failed: ${e.message}`, 'error');
       }
-    }
-
-    function renderReplyBreakdown(rows, repliedEvents, lastScannedAtRaw, replySummaryEl, replyBodyEl) {
-      const search = (document.getElementById('reportCampaignSearch')?.value || '').trim().toLowerCase();
-
-      const sentBySender = {};
-      for (const row of rows || []) {
-        const campaignName = String(row.campaignName || row.campaignKey || '').trim();
-        const senderEmail = String(row.senderEmail || '').trim().toLowerCase();
-        const sent = Number(row.sent || 0);
-        if (!campaignName || !senderEmail || sent <= 0) continue;
-        const key = `${campaignName}|${senderEmail}`;
-        sentBySender[key] = (sentBySender[key] || 0) + sent;
-      }
-
-      const uniqueReplyRecipientsBySender = {};
-      for (const ev of repliedEvents || []) {
-        const campaignName = String(ev.campaignName || ev.campaignId || '').trim();
-        const senderEmail = String(ev.senderEmail || '').trim().toLowerCase();
-        const recipientEmail = String(ev.recipientEmail || '').trim().toLowerCase();
-        if (!campaignName || !senderEmail) continue;
-        if (search && !campaignName.toLowerCase().includes(search)) continue;
-        const key = `${campaignName}|${senderEmail}`;
-        uniqueReplyRecipientsBySender[key] ||= new Set();
-        if (recipientEmail) uniqueReplyRecipientsBySender[key].add(recipientEmail);
-      }
-
-      const senderRows = Object.keys(sentBySender).map((key) => {
-        const splitAt = key.indexOf("|");
-        const campaignName = key.slice(0, splitAt);
-        const senderEmail = key.slice(splitAt + 1);
-        const sent = Number(sentBySender[key] || 0);
-        const replies = Number(uniqueReplyRecipientsBySender[key]?.size || 0);
-        const noReply = Math.max(0, sent - replies);
-        const replyPercent = sent > 0 ? Math.round((replies / sent) * 100) : 0;
-        return { campaignName, senderEmail, sent, replies, noReply, replyPercent };
-      }).sort((a, b) => b.sent - a.sent);
-
-      const totalSent = senderRows.reduce((n, r) => n + Number(r.sent || 0), 0);
-      const totalReplies = senderRows.reduce((n, r) => n + Number(r.replies || 0), 0);
-      const totalNoReply = Math.max(0, totalSent - totalReplies);
-      const totalReplyPct = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0;
-
-      let lastScanText = "never";
-      const lastScannedAt = Number(lastScannedAtRaw || 0);
-      if (lastScannedAt) {
-        const daysAgo = Math.floor((Date.now() - lastScannedAt) / (24 * 60 * 60 * 1000));
-        lastScanText = `${formatDateTimeNoYear(lastScannedAt)} (${daysAgo} day(s) ago)`;
-      }
-
-      if (replySummaryEl) {
-        replySummaryEl.textContent = `Last Scan: ${lastScanText} | Total Sent: ${totalSent} | Replies: ${totalReplies} | No Reply: ${totalNoReply} | Reply %: ${totalReplyPct}%`;
-      }
-
-      if (!replyBodyEl) return;
-      if (!senderRows.length) {
-        replyBodyEl.innerHTML = `<tr><td colspan="6" class="mini">No data</td></tr>`;
-        return;
-      }
-
-      replyBodyEl.innerHTML = senderRows.map((r) => `
-        <tr>
-          <td>${escapeHtml(r.campaignName || '')}</td>
-          <td>${escapeHtml(getSenderNameByEmail(r.senderEmail || ''))}</td>
-          <td><strong>${Number(r.sent || 0)}</strong></td>
-          <td>${Number(r.replies || 0)}</td>
-          <td>${Number(r.noReply || 0)}</td>
-          <td>${Number(r.replyPercent || 0)}%</td>
-        </tr>
-      `).join('');
     }
 
     async function ensureCampaignNameOptions() {
@@ -2081,24 +1975,6 @@
       }
     }
 
-    async function scanRepliesNow() {
-      const btn = document.getElementById('reportScanRepliesBtn');
-      const replySummaryEl = document.getElementById('replySummary');
-
-      try {
-        if (btn) btn.disabled = true;
-        if (replySummaryEl) replySummaryEl.textContent = 'Scanning replies...';
-        await emailAPI.getCampaignReplies({}, true);
-        await loadCampaignReport();
-        log('Reply scan completed', 'success');
-      } catch (e) {
-        if (replySummaryEl) replySummaryEl.textContent = `Reply scan failed: ${e.message}`;
-        log(`Reply scan failed: ${e.message}`, 'error');
-      } finally {
-        if (btn) btn.disabled = false;
-      }
-    }
-
     function downloadCampaignReportCsv() {
       if (!Array.isArray(state.reportRows) || state.reportRows.length === 0) {
         log('No report data to download', 'warning');
@@ -2126,6 +2002,93 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+
+    function getTemplateVariableKeys() {
+      const keys = new Set(['brandName', 'senderName', 'campaignName']);
+      const firstContact = state.contacts && state.contacts.length ? state.contacts[0] : null;
+      if (firstContact && typeof firstContact === 'object') {
+        Object.keys(firstContact).forEach((k) => {
+          if (k && typeof k === 'string') keys.add(k);
+        });
+      }
+      return Array.from(keys);
+    }
+
+    function extractTemplateVariables(text) {
+      const vars = [];
+      const re = /{{\s*([^{}]+?)\s*}}/g;
+      let m;
+      while ((m = re.exec(text || '')) !== null) {
+        const raw = String(m[1] || '').trim();
+        if (raw) vars.push(raw);
+      }
+      return vars;
+    }
+
+    function runTemplateCheck() {
+      const subject = document.getElementById('subjectLine')?.value || '';
+      const body = document.getElementById('emailContent')?.value || '';
+      const queryRaw = (document.getElementById('templateCheckSearch')?.value || '').trim();
+      const output = document.getElementById('templateCheckResult');
+      if (!output) return;
+
+      const templateText = `${subject}\n${body}`;
+      const usedVars = Array.from(new Set(extractTemplateVariables(templateText)));
+      const availableVars = getTemplateVariableKeys();
+      const availableExact = new Set(availableVars);
+      const availableLowerMap = new Map(availableVars.map((k) => [k.toLowerCase(), k]));
+
+      const unknown = [];
+      const warnings = [];
+      for (const v of usedVars) {
+        if (availableExact.has(v)) continue;
+        const lower = availableLowerMap.get(v.toLowerCase());
+        if (lower) {
+          warnings.push(`${v} -> use exact: {{${lower}}}`);
+          continue;
+        }
+        unknown.push(v);
+      }
+
+      const validPlaceholderRe = /{{\s*[^{}]+?\s*}}/g;
+      const braceRemainder = templateText.replace(validPlaceholderRe, '');
+      const brokenBraceSnippets = [];
+      if (braceRemainder.includes('{') || braceRemainder.includes('}')) {
+        for (let i = 0; i < braceRemainder.length; i++) {
+          const ch = braceRemainder[i];
+          if (ch !== '{' && ch !== '}') continue;
+          const start = Math.max(0, i - 12);
+          const end = Math.min(braceRemainder.length, i + 18);
+          const snippet = braceRemainder.slice(start, end).replace(/\s+/g, ' ').trim();
+          if (snippet && !brokenBraceSnippets.includes(snippet)) brokenBraceSnippets.push(snippet);
+          if (brokenBraceSnippets.length >= 3) break;
+        }
+      }
+      if (brokenBraceSnippets.length) {
+        warnings.push(`Invalid placeholder syntax detected near: ${brokenBraceSnippets.join(' | ')}`);
+      }
+
+      const openCount = (templateText.match(/{{/g) || []).length;
+      const closeCount = (templateText.match(/}}/g) || []).length;
+      if (openCount !== closeCount) warnings.push(`Bracket mismatch: {{=${openCount}, }}=${closeCount}`);
+
+      const queryName = queryRaw.replace(/[{}]/g, '').trim();
+      let queryInfo = '';
+      if (queryName) {
+        const exactMatches = usedVars.filter(v => v === queryName).length;
+        const ciMatches = usedVars.filter(v => v.toLowerCase() === queryName.toLowerCase()).length;
+        queryInfo = `Search variable {{${queryName}}}: ${exactMatches ? 'found' : (ciMatches ? 'case mismatch' : 'not found')}`;
+      }
+
+      const parts = [];
+      if (queryInfo) parts.push(escapeHtml(queryInfo));
+      parts.push(`Variables used: ${usedVars.length ? usedVars.map((v) => `{{${escapeHtml(v)}}}`).join(', ') : 'none'}`);
+      parts.push(`Unknown variables: ${unknown.length ? unknown.map((v) => `{{${escapeHtml(v)}}}`).join(', ') : 'none'}`);
+      if (warnings.length) parts.push(`Warnings: ${warnings.map(escapeHtml).join(' | ')}`);
+
+      output.innerHTML = parts.join('<br>');
+      log(`Variable check complete. Unknown vars: ${unknown.length}`, (unknown.length || warnings.length) ? 'warning' : 'success');
     }
 
     function updateStatsFromLocalCsvOnly() {
