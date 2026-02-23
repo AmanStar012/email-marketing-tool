@@ -158,227 +158,108 @@ active: false
 {
 id: 21,
 name: 'Account 21',
-email: 'sanjaytalentmanager@gmail.com',
-password: 'bwoekhfrcmkxcyqq',
-active: false
-},
-{
-id: 22,
-name: 'Account 22',
-email: 'mukultalentmanager@gmail.com',
-password: 'xjpgbwetasfxoevz',
-active: false
-},
-{
-id: 23,
-name: 'Account 23',
 email: 'albaabtalentmanager@gmail.com',
 password: 'ekankglzkqxjrcgk',
 active: false
 },
 {
-id: 24,
-name: 'Account 24',
-email: 'haidertalentmanager@gmail.com',
-password: 'hhjrdircmjvgvjmj',
-active: false
-},
-{
-id: 25,
-name: 'Account 25',
-email: 'gonikatalentmanager@gmail.com',
-password: 'iayiyikuozwsexqm',
-active: false
-},
-{
-id: 26,
-name: 'Account 26',
-email: 'muskantalentmanager@gmail.com',
-password: 'bvwhuicgikwkxzpg',
-active: false
-},
-{
-id: 27,
-name: 'Account 27',
-email: 'nidatalentmanager@gmail.com',
-password: 'njsfqibmlwcxfbyk',
-active: false
-},
-{
-id: 28,
-name: 'Account 28',
-email: 'arshadtalentmanager@gmail.com',
-password: 'ylfyjzfrhofwkuoj',
-active: false
-},
-{
-id: 29,
-name: 'Account 29',
+id: 22,
+name: 'Account 22',
 email: 'divyanshutalentmanager@gmail.com',
 password: 'xnmbulytpsiofnwn',
 active: false
 },
-{
-id: 30,
-name: 'Account 30',
-email: 'nilamtalentmanager@gmail.com',
-password: 'bdkscfgtlgxhvvmw',
-active: false
-},
-{
-id: 31,
-name: 'Account 31',
-email: 'faiztalentmanager@gmail.com',
-password: 'nojkuxcnywydbdim',
-active: false
-},
-{
-id: 32,
-name: 'Account 32',
-email: 'mayanktalentmanager@gmail.com',
-password: 'fyqhfnafbofaoapw',
-active: false
-},
-{
-id: 33,
-name: 'Account 33',
-email: 'krishnatalentmanager@gmail.com',
-password: 'uvdpmxwkwsmtggzr',
-active: false
-},
-{
-id: 34,
-name: 'Account 34',
-email: 'ojastalentmanager@gmail.com',
-password: 'pihrnsbigntorpwf',
-active: false
-},
 {      
-id: 35,
-name: 'Account 35',
+id: 23,
+name: 'Account 23',
 email: 'haiderr12124@gmail.com',
 password: 'zfxpjdjospolazoy',
 active: false
 },   
-{
-id: 36,
-name: 'Account 36',
-email: 'hussaintalentmanager@gmail.com',
-password: 'vopujcibukkhhwcz',
+{      
+id: 24,
+name: 'Account 24',
+email: 'ishita@mywallcollabs.com',
+password: 'khushi@12345',
+active: false
+},  
+      {      
+id: 25,
+name: 'Account 25',
+email: 'nandini@mywallcollabs.com',
+password: 'khushi@12345',
 active: false
 },
-{
-id: 37,
-name: 'Account 37',
-email: 'samsertalentmanager@gmail.com',
-password: 'iupvrrmgberxbxcm',
+           {      
+id: 26,
+name: 'Account 26',
+email: 'shreya@mywallcollabs.com',
+password: 'khushi@12345',
 active: false
 },
-{
-id: 38,
-name: 'Account 38',
-email: 'kamrentalentmanager@gmail.com',
-password: 'ouop fpzs cauz xdov',
+           {      
+id: 27,
+name: 'Account 27',
+email: 'vanshika@mywallcollabs.com',
+password: 'khushi@12345',
 active: false
 },
-{
-id: 39,
-name: 'Account 39',
-email: 'sufiyatalentmanager@gmail.com',
-password: 'pliz fbzr sobh krqm',
+                 {      
+id: 28,
+name: 'Account 28',
+email: 'sakshi@mywallinfluencer.com',
+password: 'khushi@12345',
 active: false
 },
-{
-id: 40,
-name: 'Account 40',
-email: 'devatalentmanager@gmail.com',
-password: 'lfxc pqez dllj kegw',
+                       {      
+id: 29,
+name: 'Account 29',
+email: 'nandini@mywallcollabs.com',
+password: 'khushi@12345',
 active: false
 },
-{
-id: 41,
-name: 'Account 41',
-email: 'neelamtalentmanager@gmail.com',
-password: 'vzyh ubnk feyg bcpy',
+                      {      
+id: 30,
+name: 'Account 30',
+email: 'shreya@mywallcollabs.com',
+password: 'khushi@12345',
+active: false
+},
+                         {      
+id: 31,
+name: 'Account 31',
+email: 'vanshika@mywallcollabs.com',
+password: 'khushi@12345',
 active: false
 },   
-{
-id: 42,
-name: 'Account 42',
-email: 'neetutalentmanager@gmail.com',
-password: 'nrnh gtxr nsce euws',
-active: false
-},
-{
-id: 43,
-name: 'Account 43',
-email: 'susmitatalentmanager@gmail.com',
-password: 'zpme bywv alqt uvhg',
+                               {      
+id: 32,
+name: 'Account 32',
+email: 'sakshi@mywallinfluencer.com',
+password: 'khushi@12345',
 active: false
 }, 
-{
-id: 44,
-name: 'Account 44',
-email: 'nehatalentmanager@gmail.com',
-password: 'riiz zglw mgza xpwx',
+                                     {      
+id: 33,
+name: 'Account 33',
+email: 'meera@mywallinfluencer.com',
+password: 'khushi@12345',
 active: false
 }, 
-{
-id: 45,
-name: 'Account 45',
-email: 'veertalentmanager@gmail.com',
-password: 'tbhn mpof ejfo ynio',
+                                           {      
+id: 34,
+name: 'Account 34',
+email: 'nandini@mywallinfluencer.com',
+password: 'khushi@12345',
 active: false
 }, 
-{
-id: 46,
-name: 'Account 46',
-email: 'devitalentmanager@gmail.com',
-password: 'jklr sbul lzih gcfx',
+                                                 {      
+id: 35,
+name: 'Account 35',
+email: 'pooja@mywallinfluencer.com',
+password: 'khushi@12345',
 active: false
-},
-{
-id: 47,
-name: 'Account 47',
-email: 'goldytalentmanager@gmail.com',
-password: 'xkov lazp yzmo lqwi',
-active: false
-},
-{
-id: 48,
-name: 'Account 48',
-email: 'sumittalentmanager@gmail.com',
-password: 'qkrh qvpc ejys yped',
-active: false
-},
-{
-id: 49,
-name: 'Account 49',
-email: 'sushanttalentmanager@gmail.com',
-password: 'ffof jury mrwq tuax',
-active: false
-},
-{
-id: 50,
-name: 'Account 50',
-email: 'gitatalentmanager@gmail.com',
-password: 'jrbj udor jtdi nwjj',
-active: false
-},
-{
-id: 51,
-name: 'Account 51',
-email: 'shimatalentmanager@gmail.com',
-password: 'xjkv sbhz lqet xvqt',
-active: false
-},
-{
-id: 52,
-name: 'Account 52',
-email: 'ayushtalentmanager@gmail.com',
-password: 'xjkv sbhz lqet xvqt',
-active: false
-},
+}
 ];
 
     // Select account based on frontend selection or use first active
