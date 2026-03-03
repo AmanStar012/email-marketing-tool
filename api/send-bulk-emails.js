@@ -183,83 +183,105 @@ email: 'ishita@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },  
-      {      
+{      
 id: 25,
 name: 'Account 25',
 email: 'nandini@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },
-           {      
+{      
 id: 26,
 name: 'Account 26',
 email: 'shreya@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },
-           {      
+{      
 id: 27,
 name: 'Account 27',
 email: 'vanshika@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },
-                 {      
+{      
 id: 28,
 name: 'Account 28',
 email: 'sakshi@mywallinfluencer.com',
 password: 'khushi@12345',
 active: false
 },
-                       {      
+{      
 id: 29,
 name: 'Account 29',
 email: 'nandini@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },
-                      {      
+{      
 id: 30,
 name: 'Account 30',
 email: 'shreya@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },
-                         {      
+{      
 id: 31,
 name: 'Account 31',
 email: 'vanshika@mywallcollabs.com',
 password: 'khushi@12345',
 active: false
 },   
-                               {      
+{      
 id: 32,
 name: 'Account 32',
 email: 'sakshi@mywallinfluencer.com',
 password: 'khushi@12345',
 active: false
 }, 
-                                     {      
+{      
 id: 33,
 name: 'Account 33',
 email: 'meera@mywallinfluencer.com',
 password: 'khushi@12345',
 active: false
 }, 
-                                           {      
+{      
 id: 34,
 name: 'Account 34',
 email: 'nandini@mywallinfluencer.com',
 password: 'khushi@12345',
 active: false
 }, 
-                                                 {      
+{      
 id: 35,
 name: 'Account 35',
 email: 'pooja@mywallinfluencer.com',
 password: 'khushi@12345',
 active: false
+}, 
+{      
+id: 36,
+name: 'Account 36',
+email: 'sanjaymywall@gmail.com',
+password: 'yfnn jerp jdfw kieo',
+active: false
+}, 
+{      
+id: 37,
+name: 'Account 37',
+email: 'mukulmywall@gmail.com',
+password: 'ehgx fvuh idxe osdf',
+active: false
+},
+{      
+id: 38,
+name: 'Account 38',
+email: 'arshadmywall@gmail.com',
+password: 'zyuj jske zlxh drbq',
+active: false
 }
+    
 ];
 
     // Select account based on frontend selection or use first active
