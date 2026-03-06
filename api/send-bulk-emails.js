@@ -180,7 +180,7 @@ active: false
 id: 24,
 name: 'Account 24',
 email: 'ishita@mywallcollabs.com',
-password: 'khushi@12345',
+password: 'ietw abje hezy zchb',
 active: false
 },  
 {      
