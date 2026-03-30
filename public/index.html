@@ -783,7 +783,14 @@
                         body: JSON.stringify(bulkData)
                     });
 
-                    const result = await response.json();
+                    const rawResponse = await response.text();
+                    let result;
+
+                    try {
+                        result = rawResponse ? JSON.parse(rawResponse) : {};
+                    } catch (parseError) {
+                        throw new Error(rawResponse || 'Server returned a non-JSON response');
+                    }
                     
                     if (!response.ok) {
                         throw new Error(result.error || 'Failed to send bulk emails');
@@ -1787,5 +1794,4 @@ Lisa,Garcia,lisa.garcia@example.com,E-commerce Plus,555-0135,Marketing Lead`;
     </script>
 </body>
 </html>
-
 
