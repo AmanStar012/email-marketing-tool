@@ -218,14 +218,14 @@ email: 'merajtalentmanager@gmail.com',
 password: 'ajyq ripo szpo zvit',
 active: false
 },
-{      
+{
 id: 30,
 name: 'Account 30',
 email: 'roshantalentmanager@gmail.com',
 password: 'ajvc flfp ltmg wxoi',
 active: false
 },
-      ;
+    ];
 
     // Select account based on frontend selection or use first active
     let currentAccount;
