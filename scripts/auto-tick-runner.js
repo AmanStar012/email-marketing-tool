@@ -14,7 +14,7 @@ const {
 const EMAILS_PER_ACCOUNT = 30;           
 const PER_EMAIL_DELAY_MIN_MS = 30 * 1000;
 const PER_EMAIL_DELAY_MAX_MS = 90 * 1000;
-const ONE_HOUR = 60 * 60 * 1000;        
+const BATCH_COOLDOWN_MS = 30 * 60 * 1000;        
 const DAILY_LIMIT = 300;               
 const MAX_RETRY = 1;
 const TICK_LOCK_TTL_MS = 50 * 60 * 1000;
@@ -73,8 +73,7 @@ function getIndiaHour() {
 function isWithinIndiaSendWindow() {
   const hour = getIndiaHour();
   if (hour == null || Number.isNaN(hour)) return false;
-  // 9:00 <= time < 20:00 (9 AM to 8 PM)
-  return hour >= 9 && hour < 20;
+  return hour >= 6 && hour < 24;
 }
 
 (async function runAutoTick() {
@@ -104,16 +103,16 @@ function isWithinIndiaSendWindow() {
     }
 
     /**
-     * ⏱️ 1-HOUR GAP BETWEEN BATCHES
+     * ⏱️ 30-MINUTE GAP BETWEEN BATCHES
      */
     if (!isWithinIndiaSendWindow()) {
-      console.log("⏰ Outside India send window (09:00-20:00 IST)");
+      console.log("⏰ Outside India send window (06:00-23:59 IST)");
       process.exit(0);
     }
 
     const lastSendAt = await redisGet(lastSendKey);
     const now = Date.now();
-    if (lastSendAt && now - Number(lastSendAt) < ONE_HOUR) {
+    if (lastSendAt && now - Number(lastSendAt) < BATCH_COOLDOWN_MS) {
       console.log("⏳ Batch cooldown active");
       process.exit(0);
     }
@@ -362,3 +361,5 @@ function isWithinIndiaSendWindow() {
     process.exit(1);
   }
 })();
+
+
