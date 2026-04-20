@@ -225,6 +225,20 @@ email: 'roshantalentmanager@gmail.com',
 password: 'ajvc flfp ltmg wxoi',
 active: false
 },
+{
+id: 31,
+name: 'Account 31',
+email: 'gauravmywall@gmail.com',
+password: 'hcou thke iznx dfym',
+active: false
+},
+{
+id: 32,
+name: 'Account 32',
+email: 'himanshumywall@gmail.com',
+password: 'wstd cjqa zlwl mroq',
+active: false
+},
     ];
 
     // Select account based on frontend selection or use first active
