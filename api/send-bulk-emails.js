@@ -25,8 +25,8 @@ module.exports = async function handler(req, res) {
       {
         id: 2,
         name: 'Account 2',
-        email: 'oravi8937@gmail.com',
-        password: 'vvqxkbraclqzclgu',
+        email: 'arjunmywall@gmail.com',
+        password: 'gbpq umqn rrcw djdv',
         active: false
       },
       {
@@ -53,8 +53,8 @@ module.exports = async function handler(req, res) {
       {
         id: 6,
         name: 'Account 6',
-        email: 'mirakhan9880@gmail.com',
-        password: 'cnkovpqzebmcirja',
+        email: 'kavyamywall@gmail.com',
+        password: 'gzdi rrtg hvqg ciyz',
         active: false
       },
       {
@@ -102,8 +102,8 @@ active: false
 {
 id: 13,
 name: 'Account 13',
-email: 'dmalvika301@gmail.com',
-password: 'tsboiaiwyoyxrepc',
+email: 'lokeshmywall@gmail.com',
+password: 'htli kzsi oluh hujv',
 active: false
 },
 {
@@ -116,8 +116,8 @@ active: false
 {
 id: 15,
 name: 'Account 15',
-email: 'kunal789arora@gmail.com',
-password: 'qkauojxcdgtdunud',
+email: 'mohitmywall@gmail.com',
+password: 'khct czvo gaza nmbk',
 active: false
 },
 {
