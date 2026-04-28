@@ -194,7 +194,7 @@ active: false
 id: 26,
 name: 'Account 26',
 email: 'goldytalentmanager@gmail.com',
-password: 'xkov lazp yzmo lqwi',
+password: 'bdrm grgp cycm mzvl',
 active: false
 },
 {      
