@@ -6,12 +6,6 @@
         "senderName": "Lalit"
     },
     {
-        "id": 2,
-        "email": "oravi8937@gmail.com",
-        "pass": "vvqxkbraclqzclgu",
-        "senderName": "Oravi"
-    },
-    {
         "id": 3,
         "email": "kavitathappar@gmail.com",
         "pass": "smgqmkpskbvhgzpb",
@@ -114,46 +108,10 @@
         "senderName": "Pradeep"
     },
     {
-        "id": 20,
-        "email": "sanjaytalentmanager@gmail.com",
-        "pass": "bwoekhfrcmkxcyqq",
-        "senderName": "Sanjay"
-    },
-    {
-        "id": 21,
-        "email": "mukultalentmanager@gmail.com",
-        "pass": "xjpgbwetasfxoevz",
-        "senderName": "Mukul"
-    },
-    {
         "id": 22,
         "email": "albaabtalentmanager@gmail.com",
         "pass": "ekankglzkqxjrcgk",
         "senderName": "Albaab"
-    },
-    {
-        "id": 23,
-        "email": "haidertalentmanager@gmail.com",
-        "pass": "hhjrdircmjvgvjmj",
-        "senderName": "Haider"
-    },
-    {
-        "id": 24,
-        "email": "gonikatalentmanager@gmail.com",
-        "pass": "iayiyikuozwsexqm",
-        "senderName": "Gonika"
-    },
-    {
-        "id": 25,
-        "email": "muskantalentmanager@gmail.com",
-        "pass": "bvwhuicgikwkxzpg",
-        "senderName": "Muskan"
-    },
-    {
-        "id": 26,
-        "email": "nidatalentmanager@gmail.com",
-        "pass": "njsfqibmlwcxfbyk",
-        "senderName": "Nida"
     },
     {
         "id": 27,
@@ -166,36 +124,6 @@
         "email": "divyanshutalentmanager@gmail.com",
         "pass": "xnmbulytpsiofnwn",
         "senderName": "Divyanshu"
-    },
-    {
-        "id": 29,
-        "email": "nilamtalentmanager@gmail.com",
-        "pass": "bdkscfgtlgxhvvmw",
-        "senderName": "Nilam"
-    },
-    {
-        "id": 30,
-        "email": "faiztalentmanager@gmail.com",
-        "pass": "nojkuxcnywydbdim",
-        "senderName": "Faiz"
-    },
-    {
-        "id": 31,
-        "email": "mayanktalentmanager@gmail.com",
-        "pass": "fyqhfnafbofaoapw",
-        "senderName": "Mayank"
-    },
-    {
-        "id": 32,
-        "email": "krishnatalentmanager@gmail.com",
-        "pass": "uvdpmxwkwsmtggzr",
-        "senderName": "Krishna"
-    },
-    {
-        "id": 33,
-        "email": "ojastalentmanager@gmail.com",
-        "pass": "pihrnsbigntorpwf",
-        "senderName": "Ojas"
     },
     {
         "id": 34,
