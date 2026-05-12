@@ -73,7 +73,7 @@ function getIndiaHour() {
 function isWithinIndiaSendWindow() {
   const hour = getIndiaHour();
   if (hour == null || Number.isNaN(hour)) return false;
-  return hour >= 6 && hour < 24;
+  return hour >= 4 && hour < 24;
 }
 
 (async function runAutoTick() {
@@ -106,7 +106,7 @@ function isWithinIndiaSendWindow() {
      * ⏱️ 30-MINUTE GAP BETWEEN BATCHES
      */
     if (!isWithinIndiaSendWindow()) {
-      console.log("⏰ Outside India send window (06:00-23:59 IST)");
+      console.log("⏰ Outside India send window (04:00-23:59 IST)");
       process.exit(0);
     }
 
